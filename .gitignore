@@ -1,0 +1,11 @@
+Thumbnail.png
+.vscode
+
+# python 相关
+# *.pyc
+# *.py
+# !.codex/skills/oasis-place-static-meshes/scripts/collect_static_mesh_bounds.py
+/Docs/tests
+.idea
+.qoder
+/TEMP/
