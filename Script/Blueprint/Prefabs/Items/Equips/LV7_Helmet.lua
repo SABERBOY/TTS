@@ -1,4 +1,4 @@
-﻿---@class LV7_Helmet_C:Template_Equipment_Helmet_C
+---@class LV7_Helmet_C:Template_Equipment_Helmet_C
 --Edit Below--
 local LV7_Helmet = {} 
 

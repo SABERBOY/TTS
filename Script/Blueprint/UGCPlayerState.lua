@@ -7,7 +7,12 @@ local UGCPlayerState = {
     CurrentController = nil,
 
     ---@type table<int32, HeroStateInfo>
-    HeroesStateInfoList = {}
+    HeroesStateInfoList = {},
+
+    -- 装备系统：六槽位永久强化等级（SlotIdx 1-6 = 头盔/衣服/首饰/手套/腰带/鞋子）
+    -- 账号内四职业共享；服务端经 ServerRPC_StrengthenEquipSlot 写入，复制属性自动同步客户端
+    ---@type integer[]
+    EquipSlotLevels = { 0, 0, 0, 0, 0, 0 }
 }
 
 ---@class HeroStateInfo
@@ -100,6 +105,6 @@ function UGCPlayerState:AddPersistAttr(AttributeType, Value)
 end
 
 function UGCPlayerState:GetReplicatedProperties()
-    return "HeroesStateInfoList"
+    return "HeroesStateInfoList", "EquipSlotLevels"
 end
 return UGCPlayerState

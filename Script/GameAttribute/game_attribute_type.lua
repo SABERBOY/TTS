@@ -320,6 +320,18 @@ UGCCustomGameAttributeType = {
 	UGCAttributeGroup_Character_SubmachineDamageRatio = 'SubmachineDamageRatio',
 	--UGC属性集 [手雷减伤-ProjDamageResist],
 	UGCAttributeGroup_Character_ProjDamageResist = 'ProjDamageResist',
+	--UGC属性集 [头盔 Equipment slot permanent strengthen level - Helmet-EquipSlotLv_Helmet],
+	UGCAttributeGroup_Character_EquipSlotLv_Helmet = 'EquipSlotLv_Helmet',
+	--UGC属性集 [衣服 Equipment slot permanent strengthen level - Chest-EquipSlotLv_Chest],
+	UGCAttributeGroup_Character_EquipSlotLv_Chest = 'EquipSlotLv_Chest',
+	--UGC属性集 [首饰 Equipment slot permanent strengthen level - Accessory-EquipSlotLv_Accessory],
+	UGCAttributeGroup_Character_EquipSlotLv_Accessory = 'EquipSlotLv_Accessory',
+	--UGC属性集 [手套 Equipment slot permanent strengthen level - Glove-EquipSlotLv_Glove],
+	UGCAttributeGroup_Character_EquipSlotLv_Glove = 'EquipSlotLv_Glove',
+	--UGC属性集 [腰带 Equipment slot permanent strengthen level - Belt-EquipSlotLv_Belt],
+	UGCAttributeGroup_Character_EquipSlotLv_Belt = 'EquipSlotLv_Belt',
+	--UGC属性集 [鞋子 Equipment slot permanent strengthen level - Shoes-EquipSlotLv_Shoes],
+	UGCAttributeGroup_Character_EquipSlotLv_Shoes = 'EquipSlotLv_Shoes',
 
 ---------------------------------------------------------
 
@@ -380,6 +392,12 @@ UGCCustomGameAttributeTypeCommentMap = {
 	['ShotgunDamageRatio'] = 'UGC属性集 [霰弹枪伤害加成-ShotgunDamageRatio]', 
 	['SubmachineDamageRatio'] = 'UGC属性集 [特质化机枪伤害加成-SubmachineDamageRatio]', 
 	['ProjDamageResist'] = 'UGC属性集 [手雷减伤-ProjDamageResist]', 
+	['EquipSlotLv_Helmet'] = 'UGC属性集 [头盔 Equipment slot permanent strengthen level - Helmet-EquipSlotLv_Helmet]', 
+	['EquipSlotLv_Chest'] = 'UGC属性集 [衣服 Equipment slot permanent strengthen level - Chest-EquipSlotLv_Chest]', 
+	['EquipSlotLv_Accessory'] = 'UGC属性集 [首饰 Equipment slot permanent strengthen level - Accessory-EquipSlotLv_Accessory]', 
+	['EquipSlotLv_Glove'] = 'UGC属性集 [手套 Equipment slot permanent strengthen level - Glove-EquipSlotLv_Glove]', 
+	['EquipSlotLv_Belt'] = 'UGC属性集 [腰带 Equipment slot permanent strengthen level - Belt-EquipSlotLv_Belt]', 
+	['EquipSlotLv_Shoes'] = 'UGC属性集 [鞋子 Equipment slot permanent strengthen level - Shoes-EquipSlotLv_Shoes]', 
 
 ---------------------------------------------------------
 

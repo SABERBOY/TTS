@@ -27,9 +27,35 @@ function UGCPlayerController:ReceiveBeginPlay()
     end
 
     self:GetCurPlayerState():InitPlayerState(self)
+
+    -- 服务端：绑定装备槽位强化属性应用器（ReceiveBeginPlay 时 Pawn 可能尚未生成，带重试）
+    if self:HasAuthority() then
+        local EquipSlotAttrApplier = require('Script.Common.EquipSlotAttrApplier')
+        local Controller = self
+        local Retries = 0
+        local function TryBind()
+            local Pawn = Controller:GetPlayerCharacterSafety()
+            if Pawn then
+                EquipSlotAttrApplier.BindPlayer(Pawn)
+                return
+            end
+            Retries = Retries + 1
+            if Retries <= 40 and UGCGameSystem.SetTimer then
+                UGCGameSystem.SetTimer(Controller, TryBind, 0.25, false)
+            end
+        end
+        TryBind()
+    end
 end
 
 function UGCPlayerController:ReceiveEndPlay()
+    if self:HasAuthority() then
+        local EquipSlotAttrApplier = require('Script.Common.EquipSlotAttrApplier')
+        local Pawn = self:GetPlayerCharacterSafety()
+        if Pawn then
+            EquipSlotAttrApplier.UnbindPlayer(Pawn)
+        end
+    end
     UGCPlayerController.SuperClass.ReceiveEndPlay(self)
 end
 
@@ -75,7 +101,7 @@ end
 
 function UGCPlayerController:GetAvailableServerRPCs()
     return "ServerTeleportTo", "ServerRPC_StartCircle", "Client_OnPawnRespawn", "ServerRPC_ChangeAttr",
-        "Client_OnMonsterWaveStart", "Server_OnHeroSelectionFinished", "ServerRPC_AddItemWithInstanceData"
+        "Client_OnMonsterWaveStart", "Server_OnHeroSelectionFinished", "ServerRPC_AddItemWithInstanceData", "ServerRPC_StrengthenEquipSlot";
 end
 
 -- GM按钮
@@ -106,6 +132,21 @@ end
 function UGCPlayerController:ServerRPC_ChangeAttr(AttrOwner, AttrName, Operation, Value)
     print(string.format("ChangeAttr: AttrName[%s], Operation[%s], Value[%f]", AttrName, Operation, Value))
     UGCAttributeSystem.AddGameAttributeOperation(AttrOwner, AttrName, EAttrOperator[Operation], Value)
+end
+
+
+-- 装备槽位强化（ 装备系统：强化的是永久槽位/装备框，不是装备本体）
+-- 服务端事务：校验槽位与余额 → 扣金币+装备零件 → 提升 UGCPlayerState.EquipSlotLevels（复制属性）
+function UGCPlayerController:ServerRPC_StrengthenEquipSlot(SlotIdx, BatchCount)
+    local EquipSlotSystem = require('Script.Common.EquipSlotSystem')
+    local CurPlayerState = self:GetCurPlayerState()
+    local PlayerPawn = self:GetPlayerCharacterSafety()
+    if not CurPlayerState or not PlayerPawn then
+        return
+    end
+    local OK, ErrCode, NewLevel = EquipSlotSystem.ServerTryStrengthen(CurPlayerState, PlayerPawn, SlotIdx, BatchCount or 1)
+    print(string.format("ServerRPC_StrengthenEquipSlot Slot=%s Count=%s OK=%s Err=%s NewLevel=%s",
+        tostring(SlotIdx), tostring(BatchCount), tostring(OK), tostring(ErrCode), tostring(NewLevel)))
 end
 
 
