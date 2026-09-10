@@ -101,7 +101,8 @@ end
 
 function UGCPlayerController:GetAvailableServerRPCs()
     return "ServerTeleportTo", "ServerRPC_StartCircle", "Client_OnPawnRespawn", "ServerRPC_ChangeAttr",
-        "Client_OnMonsterWaveStart", "Server_OnHeroSelectionFinished", "ServerRPC_AddItemWithInstanceData", "ServerRPC_StrengthenEquipSlot";
+        "Client_OnMonsterWaveStart", "Server_OnHeroSelectionFinished", "ServerRPC_AddItemWithInstanceData",
+        "ServerRPC_StrengthenEquipSlot", "ServerRPC_GMAddItem";
 end
 
 -- GM按钮
@@ -147,6 +148,28 @@ function UGCPlayerController:ServerRPC_StrengthenEquipSlot(SlotIdx, BatchCount)
     local OK, ErrCode, NewLevel = EquipSlotSystem.ServerTryStrengthen(CurPlayerState, PlayerPawn, SlotIdx, BatchCount or 1)
     print(string.format("ServerRPC_StrengthenEquipSlot Slot=%s Count=%s OK=%s Err=%s NewLevel=%s",
         tostring(SlotIdx), tostring(BatchCount), tostring(OK), tostring(ErrCode), tostring(NewLevel)))
+end
+
+---GM：添加物品。ItemID=0 时加第一货币（金币）
+function UGCPlayerController:ServerRPC_GMAddItem(ItemID, Count)
+    ItemID = tonumber(ItemID)
+    Count = math.floor(tonumber(Count) or 1)
+    if Count <= 0 then
+        Count = 1
+    end
+    if not ItemID or ItemID == 0 then
+        local EquipSlotSystem = require('Script.Common.EquipSlotSystem')
+        ItemID = EquipSlotSystem.GetGoldItemID(self)
+    end
+    if not ItemID then
+        print('[GM] ServerRPC_GMAddItem: no ItemID')
+        return
+    end
+    local OK, Err = pcall(function()
+        UGCBackpackSystemV2.AddItemV2(self, ItemID, Count)
+    end)
+    print(string.format('[GM] ServerRPC_GMAddItem ItemID=%s Count=%s ok=%s err=%s',
+        tostring(ItemID), tostring(Count), tostring(OK), tostring(Err)))
 end
 
 

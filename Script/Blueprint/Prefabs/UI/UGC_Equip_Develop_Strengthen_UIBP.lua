@@ -23,6 +23,7 @@
 ---  执行前预览目标等级、属性增量与完整消耗；请求处理中禁止重复点击（事务幂等由服务端保证）。
 ---  由 UGC_Equip_Basics_Main_UIBP 点击装备槽后 InitData{SlotIdx, CloseCallback} 打开。
 local EquipSlotSystem = require('Script.Common.EquipSlotSystem')
+local EquipUIHelper = require('Script.Common.EquipUIHelper')
 
 local UGC_Equip_Develop_Strengthen_UIBP = {
     bInitDoOnce = false,
@@ -34,6 +35,12 @@ local UGC_Equip_Develop_Strengthen_UIBP = {
     -- 请求锁与属性变化刷新（RPC 单向，等级变化由属性复制驱动，无需 Tick）
     bRequesting = false,
     SlotLevelAttrHandle = nil, -- 当前绑定的 EquipSlotLv_* 属性变化委托
+    bBagListBound = false,
+    BagItems = {},
+    BagClickData = {},
+    bMaterialListBound = false,
+    bBasicListBound = false,
+    MaterialItems = {},
 }
 
 --安全执行：捕获 Lua 错误并记录（原生崩溃无法捕获，但阶段 print 可定位）
@@ -137,15 +144,20 @@ function UGC_Equip_Develop_Strengthen_UIBP:Refresh()
         Preview.Level, Preview.GoldCost, Preview.PartsCost, Preview.GoldHave,
         tostring(Preview.Maxed), tostring(Preview.Affordable)))
 
-    -- 顶部信息区：槽位名 / 等级 / 属性类型 / 当前累计加成 → 下一级加成
+    -- 顶部信息区：槽位名 / 等级 / 属性类型 / 当前累计加成 → 下一级加成 + 当前装备图标
     SafeCall('GradeItem', function()
         local Grade = self.Equip_Grade_Item
         if Grade then
             if Grade.TextBlock_IconName then Grade.TextBlock_IconName:SetText(SlotDef.Name .. '槽') end
             if Grade.TextBlock_Num then Grade.TextBlock_Num:SetText('Lv.' .. tostring(Preview.Level)) end
             if Grade.TextBlock_Part then Grade.TextBlock_Part:SetText(AttrName) end
+            if Grade.TextBlock_Profession then Grade.TextBlock_Profession:SetText('全职业共享') end
             if Grade.TextBlock_Value then
                 Grade.TextBlock_Value:SetText(string.format('+%d → +%d', Preview.CurBonus, Preview.NextBonus))
+            end
+            local _, ItemID = EquipUIHelper.GetEquippedOnSlot(SlotIdx)
+            if Grade.Equip_Icon_Item then
+                EquipUIHelper.ApplyIconItem(Grade.Equip_Icon_Item, ItemID, Preview.Level, SlotDef.Name, ItemID ~= nil)
             end
         end
     end)
@@ -181,28 +193,196 @@ function UGC_Equip_Develop_Strengthen_UIBP:Refresh()
         end
     end)
 
-    -- 属性组/材料组子控件：内核 lua 接口未知，防御性传入预览数据
+    -- 属性组/材料组
     SafeCall('GroupItems', function()
-        if self.Equip_Basic_GroupItem and CheckObjectContainsField(self.Equip_Basic_GroupItem, 'InitData', true) then
-            self.Equip_Basic_GroupItem:InitData({
-                SlotIdx = SlotIdx,
-                Level = Preview.Level,
-                AttrType = SlotDef.AttrType,
-                AttrName = AttrName,
-                CurBonus = Preview.CurBonus,
-                NextBonus = Preview.NextBonus,
-            })
-        end
-        if self.Equip_Materials_GroupItem and CheckObjectContainsField(self.Equip_Materials_GroupItem, 'InitData', true) then
-            self.Equip_Materials_GroupItem:InitData({
-                GoldCost = Preview.GoldCost,
-                PartsCost = Preview.PartsCost,
-                GoldHave = Preview.GoldHave,
-                PartsHave = Preview.PartsHave,
-            })
-        end
+        self:RefreshBasicGroup(SlotIdx, SlotDef, Preview, AttrName)
+        self:RefreshMaterialGroup(Preview)
     end)
+    self:RefreshBagList()
     print('[EquipStrengthen] Refresh end')
+end
+
+function UGC_Equip_Develop_Strengthen_UIBP:EnsureBagListBound()
+    if self.bBagListBound then
+        return
+    end
+    local List = self.ReuseList2_Bag
+    if not List then
+        return
+    end
+    local OK, Err = pcall(function()
+        List.OnUpdateItem:Add(self.OnUpdateBagItem, self)
+    end)
+    if OK then
+        self.bBagListBound = true
+        print('[EquipStrengthen] ReuseList2_Bag bound')
+    else
+        print('[EquipStrengthen] bag list bind failed ' .. tostring(Err))
+    end
+end
+
+function UGC_Equip_Develop_Strengthen_UIBP:RefreshBagList()
+    self:EnsureBagListBound()
+    local PC = UGCGameSystem.GetLocalPlayerController()
+    self.BagItems = EquipUIHelper.CollectBagEquipItems(PC)
+    if self.ReuseList2_Bag then
+        pcall(function()
+            self.ReuseList2_Bag:Reload(#self.BagItems)
+        end)
+        print('[EquipStrengthen] bag Reload count=' .. tostring(#self.BagItems))
+    end
+end
+
+function UGC_Equip_Develop_Strengthen_UIBP:OnUpdateBagItem(Widget, Index)
+    if not Widget then
+        return
+    end
+    local Data = self.BagItems and (self.BagItems[Index + 1] or self.BagItems[Index])
+    if not Data then
+        return
+    end
+    local Level = 0
+    if Data.SlotIdx then
+        local PlayerState, PlayerPawn = self:GetPlayerStateAndPawn()
+        Level = EquipSlotSystem.GetSlotLevel(PlayerState, Data.SlotIdx, PlayerPawn)
+    end
+    local SlotDef = Data.SlotIdx and EquipSlotSystem.GetSlotDef(Data.SlotIdx) or nil
+    EquipUIHelper.ApplyIconItem(Widget, Data.ItemID, Level, SlotDef and SlotDef.Name or '', Data.bEquipped)
+    local Key = tostring(Widget)
+    self.BagClickData = self.BagClickData or {}
+    self.BagClickBound = self.BagClickBound or {}
+    self.BagClickData[Key] = Data
+    if self.BagClickBound[Key] or not Widget.Common_DragDrop_Item then
+        return
+    end
+    local WeakSelf = WeakObjectPtr(self)
+    local WeakWidget = WeakObjectPtr(Widget)
+    local OK = pcall(function()
+        Widget.Common_DragDrop_Item.OnDragClicked:Add(function()
+            if not WeakSelf:IsValid() or not WeakWidget:IsValid() then
+                return
+            end
+            local SelfRef = WeakSelf:Get()
+            local ItemWidget = WeakWidget:Get()
+            local ClickData = SelfRef and SelfRef.BagClickData and SelfRef.BagClickData[tostring(ItemWidget)]
+            if not SelfRef or not ClickData or not ClickData.SlotIdx then
+                return
+            end
+            print(string.format('[EquipStrengthen] bag click ItemID=%s SlotIdx=%s equipped=%s',
+                tostring(ClickData.ItemID), tostring(ClickData.SlotIdx), tostring(ClickData.bEquipped)))
+            SelfRef:InitData({
+                SlotIdx = ClickData.SlotIdx,
+                CloseCallback = SelfRef.CloseCallback,
+            })
+        end)
+    end)
+    if OK then
+        self.BagClickBound[Key] = true
+    end
+end
+
+function UGC_Equip_Develop_Strengthen_UIBP:RefreshBasicGroup(SlotIdx, SlotDef, Preview, AttrName)
+    local Group = self.Equip_Basic_GroupItem
+    if not Group then
+        return
+    end
+    local Title = EquipUIHelper.TryGetWidget(Group, 'TextBlock_0')
+    if Title then
+        Title:SetText('基础属性')
+    end
+    self.BasicItems = {
+        {
+            Name = AttrName,
+            OldValue = '+' .. tostring(Preview.CurBonus),
+            NewValue = '+' .. tostring(Preview.NextBonus),
+        },
+    }
+    local Box = EquipUIHelper.TryGetWidget(Group, 'WrapGroupBox_property')
+    if not Box then
+        return
+    end
+    if not self.bBasicListBound then
+        local OK = pcall(function()
+            Box.OnUpdateItem:Add(self.OnUpdateBasicItem, self)
+        end)
+        if OK then
+            self.bBasicListBound = true
+        end
+    end
+    pcall(function()
+        Box:Reload(#self.BasicItems)
+    end)
+end
+
+function UGC_Equip_Develop_Strengthen_UIBP:OnUpdateBasicItem(Widget, Index)
+    if not Widget then
+        return
+    end
+    local Data = self.BasicItems and (self.BasicItems[Index + 1] or self.BasicItems[Index])
+    if not Data then
+        return
+    end
+    local NameText = EquipUIHelper.TryGetWidget(Widget, 'TextBlock_AttributeName')
+    if NameText then NameText:SetText(Data.Name) end
+    local OldText = EquipUIHelper.TryGetWidget(Widget, 'TextBlock_Old')
+    if OldText then OldText:SetText(Data.OldValue) end
+    local NewText = EquipUIHelper.TryGetWidget(Widget, 'TextBlock_New')
+    if NewText then NewText:SetText(Data.NewValue) end
+end
+
+function UGC_Equip_Develop_Strengthen_UIBP:RefreshMaterialGroup(Preview)
+    local Group = self.Equip_Materials_GroupItem
+    if not Group then
+        return
+    end
+    local Title = EquipUIHelper.TryGetWidget(Group, 'TextBlock_0')
+    if Title then
+        Title:SetText('升级材料')
+    end
+    self.MaterialItems = {
+        { Have = Preview.GoldHave, Need = Preview.GoldCost },
+        { Have = Preview.PartsHave or 0, Need = Preview.PartsCost },
+    }
+    local List = EquipUIHelper.TryGetWidget(Group, 'ReuseList2')
+    if not List then
+        return
+    end
+    if not self.bMaterialListBound then
+        local OK = pcall(function()
+            List.OnUpdateItem:Add(self.OnUpdateMaterialItem, self)
+        end)
+        if OK then
+            self.bMaterialListBound = true
+        end
+    end
+    pcall(function()
+        List:Reload(#self.MaterialItems)
+    end)
+end
+
+function UGC_Equip_Develop_Strengthen_UIBP:OnUpdateMaterialItem(Widget, Index)
+    if not Widget then
+        return
+    end
+    local Data = self.MaterialItems and (self.MaterialItems[Index + 1] or self.MaterialItems[Index])
+    if not Data then
+        return
+    end
+    local Enough = (Data.Have or 0) >= (Data.Need or 0)
+    local Switcher = EquipUIHelper.TryGetWidget(Widget, 'WidgetSwitcher_Meterial')
+    if Switcher then
+        pcall(function()
+            Switcher:SetActiveWidgetIndex(Enough and 0 or 1)
+        end)
+    end
+    local function SetNamed(Name, Value)
+        local Text = EquipUIHelper.TryGetWidget(Widget, Name)
+        if Text then Text:SetText(tostring(Value)) end
+    end
+    SetNamed('TextBlock_Hold', Data.Have or 0)
+    SetNamed('TextBlock_Need', Data.Need or 0)
+    SetNamed('TextBlock_Quantity', Data.Have or 0)
+    SetNamed('TextBlock_Need_Quantity', Data.Need or 0)
 end
 
 ---强化按钮：+1 级
@@ -330,6 +510,14 @@ function UGC_Equip_Develop_Strengthen_UIBP:Destruct()
     self.CloseCallback = nil
     self.bRequesting = false
     self.bButtonsBound = false
+    self.bBagListBound = false
+    self.BagItems = {}
+    self.BagClickData = {}
+    self.BagClickBound = {}
+    self.bMaterialListBound = false
+    self.bBasicListBound = false
+    self.MaterialItems = {}
+    self.BasicItems = {}
     self.bInitDoOnce = false
 end
 

@@ -93,6 +93,55 @@ function EquipSlotSystem.GetSlotTargetAttr(AttrType)
     return AttrType == 'Atk' and 'BaseAttack' or 'BaseHealth'
 end
 
+-- 策划六槽 → 内核通用装备槽。手套/腰带暂无独立内核槽，读装备时按空处理。
+EquipSlotSystem.KernelSlotNames = {
+    [1] = 'EquipmentSlot.Common.Head',
+    [2] = 'EquipmentSlot.Common.UpBody',
+    [3] = 'EquipmentSlot.Common.Ornament',
+    [4] = nil,
+    [5] = nil,
+    [6] = 'EquipmentSlot.Common.BelowBody',
+}
+
+function EquipSlotSystem.GetKernelSlotName(SlotIdx)
+    return EquipSlotSystem.KernelSlotNames[SlotIdx]
+end
+
+function EquipSlotSystem.GetSlotIdxByKernelName(SlotName)
+    if not SlotName or SlotName == '' then
+        return nil
+    end
+    for SlotIdx, Name in pairs(EquipSlotSystem.KernelSlotNames) do
+        if Name == SlotName then
+            return SlotIdx
+        end
+    end
+    return nil
+end
+
+---背包 DefineID（userdata struct / table / number）→ 物品 ID，空槽返回 nil
+function EquipSlotSystem.GetDefineItemID(DefineID)
+    if DefineID == nil then
+        return nil
+    end
+    if type(DefineID) == 'number' then
+        return DefineID ~= 0 and DefineID or nil
+    end
+    if type(DefineID) == 'table' or type(DefineID) == 'userdata' then
+        local OK, Value = pcall(function()
+            return DefineID.TypeSpecificID or DefineID.ItemID
+        end)
+        if OK and type(Value) == 'number' and Value ~= 0 then
+            return Value
+        end
+    end
+    return nil
+end
+
+function EquipSlotSystem.IsDefineIDValid(DefineID)
+    return EquipSlotSystem.GetDefineItemID(DefineID) ~= nil
+end
+
 ---升到目标等级 TargetLevel 的单级消耗
 function EquipSlotSystem.GetGoldCost(TargetLevel)
     return EquipSlotSystem.GOLD_BASE + EquipSlotSystem.GOLD_PER_LEVEL * TargetLevel

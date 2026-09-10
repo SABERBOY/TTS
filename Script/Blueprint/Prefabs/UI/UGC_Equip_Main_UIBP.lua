@@ -10,6 +10,9 @@
 ---@field ReuseList2_Level2 ReuseList2_C
 ---@field ScaleBox_IPX UScaleBox
 ---@field TextBlock_Title UTextBlock
+---@field UGC_Equip_Basics_Main_UIBP_7 UGC_Equip_Basics_Main_UIBP_C
+---@field UGC_Equip_Develop_Strengthen_UIBP UGC_Equip_Develop_Strengthen_UIBP_C
+---@field UGC_Equip_Develop_Transform_UIBP UGC_Equip_Develop_Transform_UIBP_C
 --Edit Below--
 local UGC_Equip_Main_UIBP = { bInitDoOnce = false } 
 
