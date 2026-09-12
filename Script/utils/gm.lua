@@ -21,9 +21,9 @@ function UGCGM:Register(DebugUI)
 
     CurFuncList["装备系统"] = {
         ["面板"] = {
-            {UGCGMUI.ItemTypeEnum.Button, {{"打开装备面板"}, {"打开 UGC_Equip_Basics_Main_UIBP：左侧当前装备，右侧背包装备"}}, "C_OpenEquipPanel"},
-            {UGCGMUI.ItemTypeEnum.Button, {{"关闭装备面板"}, {"隐藏装备面板"}}, "C_CloseEquipPanel"},
-            {UGCGMUI.ItemTypeEnum.Button, {{"打开头盔强化面板"}, {"直接弹出头盔槽强化面板 UGC_Equip_Develop_Strengthen_UIBP"}}, "C_OpenHelmetStrengthen"},
+            {UGCGMUI.ItemTypeEnum.Button, {{"打开装备面板"}, {"打开 UGC_Equip_Main_UIBP：右侧页签切换装备/强化/转化"}}, "C_OpenEquipPanel"},
+            {UGCGMUI.ItemTypeEnum.Button, {{"关闭装备面板"}, {"隐藏装备主页面"}}, "C_CloseEquipPanel"},
+            {UGCGMUI.ItemTypeEnum.Button, {{"打开头盔强化面板"}, {"打开装备主页面并切到头盔槽强化页签"}}, "C_OpenHelmetStrengthen"},
         },
         ["测试物品"] = {
             {UGCGMUI.ItemTypeEnum.Button, {{"添加测试头盔"}, {"DS 添加 LV7_Helmet(8310017)，可装备物品会自动穿上"}}, "C_AddTestHelmet"},
@@ -67,19 +67,19 @@ local TEST_GOLD_COUNT = 100000
 function UGCGM:C_OpenEquipPanel()
     print('[GM] C_OpenEquipPanel')
     local EquipPanelManager = require('Script.Common.EquipPanelManager')
-    EquipPanelManager.OpenBasics()
+    EquipPanelManager.Open({ PageId = 'basics' })
 end
 
 function UGCGM:C_CloseEquipPanel()
     print('[GM] C_CloseEquipPanel')
     local EquipPanelManager = require('Script.Common.EquipPanelManager')
-    EquipPanelManager.CloseBasics()
+    EquipPanelManager.Close()
 end
 
 function UGCGM:C_OpenHelmetStrengthen()
     print('[GM] C_OpenHelmetStrengthen')
     local EquipPanelManager = require('Script.Common.EquipPanelManager')
-    EquipPanelManager.OpenStrengthen(1)
+    EquipPanelManager.Open({ PageId = 'strengthen', SlotIdx = 1 })
 end
 
 function UGCGM:C_AddTestHelmet()
@@ -93,7 +93,7 @@ function UGCGM:C_AddTestHelmet()
     -- 物品同步到客户端后刷新已打开的装备面板
     UGCGameSystem.SetTimer(PC, function()
         local EquipPanelManager = require('Script.Common.EquipPanelManager')
-        local Widget = EquipPanelManager.GetBasicsWidget()
+        local Widget = EquipPanelManager.GetMainWidget()
         if Widget and CheckObjectContainsField(Widget, 'Refresh', true) then
             Widget:Refresh()
         end

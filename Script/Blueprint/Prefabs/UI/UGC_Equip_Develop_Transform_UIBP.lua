@@ -18,20 +18,35 @@
 ---@field TextBlock_Choose UTextBlock
 ---@field TextBlock_Grade UTextBlock
 --Edit Below--
-local UGC_Equip_Develop_Transform_UIBP = { bInitDoOnce = false } 
+---装备转化面板（占位）：由 UGC_Equip_Main_UIBP 二级页签切入，玩法逻辑后续再接。
+local UGC_Equip_Develop_Transform_UIBP = { bInitDoOnce = false }
 
---[==[ Construct
 function UGC_Equip_Develop_Transform_UIBP:Construct()
-	
+    self:LuaInit()
 end
--- Construct ]==]
 
--- function UGC_Equip_Develop_Transform_UIBP:Tick(MyGeometry, InDeltaTime)
+function UGC_Equip_Develop_Transform_UIBP:LuaInit()
+    if self.bInitDoOnce then
+        return
+    end
+    self.bInitDoOnce = true
+    print('[EquipTransform] LuaInit')
+    if self.TextBlock_Choose then
+        self.TextBlock_Choose:SetText('转化')
+    end
+    if self.TextBlock_Grade then
+        self.TextBlock_Grade:SetText('转化')
+    end
+end
 
--- end
+function UGC_Equip_Develop_Transform_UIBP:InitData(InParams)
+    self.InParams = InParams or {}
+    print('[EquipTransform] InitData')
+end
 
--- function UGC_Equip_Develop_Transform_UIBP:Destruct()
-
--- end
+function UGC_Equip_Develop_Transform_UIBP:Destruct()
+    self.InParams = nil
+    self.bInitDoOnce = false
+end
 
 return UGC_Equip_Develop_Transform_UIBP

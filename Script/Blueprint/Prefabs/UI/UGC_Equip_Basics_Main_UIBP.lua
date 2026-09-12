@@ -15,87 +15,103 @@
 ---@field UGC_Equip_Bag_UIBP UGC_Equip_Bag_UIBP_C
 --Edit Below--
 ---装备显示面板（装备系统）：
+---  挂在 UGC_Equip_Main_UIBP 左侧；不再作为独立页面打开。
 ---  左侧 = 玩家当前已装备的六槽位（头盔/衣服/首饰/手套/腰带/鞋子），显示各槽位永久强化等级；
 ---  右侧 = 背包装备列表（内核子面板 UGC_Equip_Bag_UIBP 承载）。
----  点击装备槽（装备框）弹出装备强化面板 UGC_Equip_Develop_Strengthen_UIBP，强化的是槽位而非装备本体。
+---  点击装备槽切到主页面强化页签，强化的是槽位而非装备本体。
 local EquipSlotSystem = require('Script.Common.EquipSlotSystem')
-local EquipUIHelper = require('Script.Common.EquipUIHelper')
 local EquipPanelManager = require('Script.Common.EquipPanelManager')
+local EquipIconItem = require('Script.Equip.UIBP.Item.UGC_Equip_Icon_Item_UIBP')
+local EquipBag = require('Script.Equip.UIBP.Item.UGC_Equip_Bag_UIBP')
 
 local UGC_Equip_Basics_Main_UIBP = {
     bInitDoOnce = false,
-    bClickBound = false, -- 槽位点击是否已绑定（必须延迟到 InitData 时机，Construct 期绑定会原生崩溃）
-    bBagListBound = false,
+    bClickBound = false,
     InParams = nil,
-    StrengthenWidget = nil, -- 已打开的强化面板（WeakObjectPtr）
-    SlotLevelAttrHandles = {}, -- 六槽位等级属性变化委托
-    BagItems = {}, -- 右侧背包装备列表
-    BagClickData = {}, -- 复用格子点击数据（不能写到 UObject 自定义字段）
+    StrengthenWidget = nil,
+    SlotLevelAttrHandles = {},
+    SlotCtrls = {},
+    BagCtrl = nil,
 }
 
--- 内核槽位控件 → 策划六槽位(SlotIdx) 映射
--- 布局依据：Slot_0/Slot_3 为中间大框(100x110)，左列 Slot_1/2/4、右列 Slot_5/6/7 为小框(72x72)
--- 策划仅六槽：中上=头盔、中下=衣服、左列=手套/腰带/鞋子、右上=首饰；Slot_6/7 备用隐藏
 local SLOT_WIDGET_MAP = {
-    Equipment_Slot_0 = 1, -- 头盔
-    Equipment_Slot_3 = 2, -- 衣服
-    Equipment_Slot_5 = 3, -- 首饰
-    Equipment_Slot_1 = 4, -- 手套
-    Equipment_Slot_2 = 5, -- 腰带
-    Equipment_Slot_4 = 6, -- 鞋子
+    -- 左边的三个槽位：头盔、衣服、首饰
+    Equipment_Slot_1 = 1, -- 头盔
+    Equipment_Slot_2 = 2, -- 衣服
+    Equipment_Slot_4 = 3, -- 首饰
+    -- 右边的三个槽位：手套、腰带、鞋子
+    Equipment_Slot_5 = 4, -- 手套
+    Equipment_Slot_6 = 5, -- 腰带
+    Equipment_Slot_7 = 6, -- 鞋子
 }
-local SPARE_SLOT_WIDGETS = { 'Equipment_Slot_6', 'Equipment_Slot_7' }
+-- 未映射到六槽的两个大格子（中间两个），隐藏；注意要与 SLOT_WIDGET_MAP 互补，别把已映射的槽藏掉
+local SPARE_SLOT_WIDGETS = { 'Equipment_Slot_0', 'Equipment_Slot_3' }
 
---构造函数，UI创建时自动调用
 function UGC_Equip_Basics_Main_UIBP:Construct()
     self:LuaInit()
 end
 
---Lua初始化函数
 function UGC_Equip_Basics_Main_UIBP:LuaInit()
     if self.bInitDoOnce then
         return
     end
     self.bInitDoOnce = true
 
-    -- 注意：槽位点击绑定不在此处做！Construct 期子控件的内核委托尚未初始化，
-    -- 索引/绑定会触发原生崩溃（已实测）。绑定延迟到 InitData/Refresh 的 EnsureSlotClickBound。
-
-    -- 策划只有六槽，备用槽位隐藏（Slot_8/9 为内核横条控件，保持默认不动）
     for _, WidgetName in ipairs(SPARE_SLOT_WIDGETS) do
         if self[WidgetName] then
             self[WidgetName]:SetVisibility(ESlateVisibility.Collapsed)
         end
     end
 
+    self.SlotCtrls = {}
+    self:EnsureSlotCtrls()
+    self.BagCtrl = EquipBag.New(self.UGC_Equip_Bag_UIBP, self)
+
     self:Refresh()
 end
 
----槽位点击绑定（须在控件构造完成后调用，即 InitData/Refresh 时机）：
----内核槽位的点击流经过 Common_DragDrop_Item.OnDragClicked（LuaMulticastDelegate），
----运行时 Add 已实测安全；实例级包装内核 lua 函数（slot.OnClicked=fn）不生效，勿用。
+---六槽代理：嵌套在 UGC_Equip_Main_UIBP 里时，Construct 期拿到的子控件对象随后会失效
+---（实测 Ctrl:GetWidget() 变 nil），每次 Refresh 前重新校验并按需重建，重建后点击要重新绑定。
+function UGC_Equip_Basics_Main_UIBP:EnsureSlotCtrls()
+    self.SlotCtrls = self.SlotCtrls or {}
+    local Rebuilt = false
+    for WidgetName, _ in pairs(SLOT_WIDGET_MAP) do
+        local W = self[WidgetName]
+        if W then
+            W:SetVisibility(ESlateVisibility.SelfHitTestInvisible)
+        end
+        local Ctrl = self.SlotCtrls[WidgetName]
+        if (not Ctrl or not Ctrl:IsValid()) and W then
+            self.SlotCtrls[WidgetName] = EquipIconItem.New(W)
+            Rebuilt = true
+        end
+    end
+    if Rebuilt then
+        self.bClickBound = false
+    end
+end
+
 function UGC_Equip_Basics_Main_UIBP:EnsureSlotClickBound()
     if self.bClickBound then
         return
     end
     local AllBound = true
+    local WeakSelf = WeakObjectPtr(self)
     for WidgetName, SlotIdx in pairs(SLOT_WIDGET_MAP) do
-        local SlotWidget = self[WidgetName]
-        local DragDrop = SlotWidget and SlotWidget.Common_DragDrop_Item
-        if DragDrop then
-            local WeakSelf = WeakObjectPtr(self)
-            local OK, Err = pcall(function()
-                DragDrop.OnDragClicked:Add(function()
-                    if not WeakSelf:IsValid() then return end
-                    local SelfRef = WeakSelf:Get()
-                    if SelfRef then
-                        SelfRef:OnSlotClicked(SlotIdx)
-                    end
-                end)
+        local Ctrl = self.SlotCtrls and self.SlotCtrls[WidgetName]
+        if Ctrl then
+            local OK = Ctrl:BindClick(function()
+                if not WeakSelf:IsValid() then
+                    return
+                end
+                local SelfRef = WeakSelf:Get()
+                if SelfRef then
+                    SelfRef:OnSlotClicked(SlotIdx)
+                end
             end)
             if not OK then
                 AllBound = false
-                print('[EquipBasics] 槽位点击绑定失败 SlotIdx=' .. tostring(SlotIdx) .. ' err=' .. tostring(Err))
+                print('[EquipBasics] 槽位点击绑定失败 SlotIdx=' .. tostring(SlotIdx))
             end
         else
             AllBound = false
@@ -107,9 +123,8 @@ function UGC_Equip_Basics_Main_UIBP:EnsureSlotClickBound()
     end
 end
 
----点击装备槽：有装备时弹出强化面板（强化的是槽位/装备框）
 function UGC_Equip_Basics_Main_UIBP:OnSlotClicked(SlotIdx)
-    local DefineID, ItemID = EquipUIHelper.GetEquippedOnSlot(SlotIdx)
+    local DefineID, ItemID = EquipSlotSystem.GetEquippedOnSlot(SlotIdx)
     print(string.format('[EquipBasics] OnSlotClicked SlotIdx=%s ItemID=%s', tostring(SlotIdx), tostring(ItemID)))
     if not ItemID then
         print('[EquipBasics] 该槽位当前没有装备，仍打开强化面板（强化对象是槽位）')
@@ -117,16 +132,15 @@ function UGC_Equip_Basics_Main_UIBP:OnSlotClicked(SlotIdx)
     self:OpenStrengthenPanel(SlotIdx)
 end
 
----打开强化面板（与 GM EquipPanelManager 共用实例）
 function UGC_Equip_Basics_Main_UIBP:OpenStrengthenPanel(SlotIdx)
     EquipPanelManager.OpenStrengthen(SlotIdx)
 end
 
----刷新面板：左侧六槽同步当前装备，右侧背包列出可装备物品
 function UGC_Equip_Basics_Main_UIBP:Refresh()
+    self:EnsureSlotCtrls()
     self:EnsureSlotClickBound()
     self:BindSlotLevelAttrs()
-    EquipUIHelper.BindAttachChange(self, function(SelfRef)
+    EquipSlotSystem.BindAttachChange(self, function(SelfRef)
         print('[EquipBasics] attach changed, Refresh')
         SelfRef:Refresh()
     end)
@@ -134,123 +148,25 @@ function UGC_Equip_Basics_Main_UIBP:Refresh()
     local PlayerPawn = self:GetLocalPlayerPawn()
 
     for WidgetName, SlotIdx in pairs(SLOT_WIDGET_MAP) do
-        local SlotWidget = self[WidgetName]
-        if SlotWidget then
+        local Ctrl = self.SlotCtrls and self.SlotCtrls[WidgetName]
+        if Ctrl then
             local SlotDef = EquipSlotSystem.GetSlotDef(SlotIdx)
             local Level = EquipSlotSystem.GetSlotLevel(PlayerState, SlotIdx, PlayerPawn)
-            local DefineID, ItemID = EquipUIHelper.GetEquippedOnSlot(SlotIdx)
-            EquipUIHelper.ApplyIconItem(SlotWidget, ItemID, Level, SlotDef and SlotDef.Name or '', ItemID ~= nil)
+            local DefineID, ItemID = EquipSlotSystem.GetEquippedOnSlot(SlotIdx)
+            Ctrl:ApplyData(ItemID, Level, SlotDef and SlotDef.Name or '', ItemID ~= nil, DefineID)
         end
     end
 
     self:RefreshBagList()
 end
 
----右侧 UGC_Equip_Bag_UIBP：列出背包装备，点击已装备项弹出对应槽位强化面板
-function UGC_Equip_Basics_Main_UIBP:EnsureBagListBound()
-    if self.bBagListBound then
-        return
-    end
-    local Bag = self.UGC_Equip_Bag_UIBP
-    local List = Bag and Bag.ReuseList_Bag
-    if not List then
-        return
-    end
-    local OK, Err = pcall(function()
-        List.OnUpdateItem:Add(self.OnUpdateBagItem, self)
-    end)
-    if OK then
-        self.bBagListBound = true
-        print('[EquipBasics] bag ReuseList_Bag bound')
-    else
-        print('[EquipBasics] bag list bind failed ' .. tostring(Err))
-    end
-end
-
 function UGC_Equip_Basics_Main_UIBP:RefreshBagList()
-    self:EnsureBagListBound()
+    if not self.BagCtrl then
+        return
+    end
     local PC = UGCGameSystem.GetLocalPlayerController()
-    self.BagItems = EquipUIHelper.CollectBagEquipItems(PC)
-    local Bag = self.UGC_Equip_Bag_UIBP
-    if Bag and Bag.TextBlock_Sorting then
-        Bag.TextBlock_Sorting:SetText('装备')
-    end
-    local List = Bag and Bag.ReuseList_Bag
-    if List then
-        pcall(function()
-            List:Reload(#self.BagItems)
-        end)
-        print('[EquipBasics] bag Reload count=' .. tostring(#self.BagItems))
-    else
-        -- 内核子面板无 ReuseList 时走防御性刷新
-        if Bag then
-            if CheckObjectContainsField(Bag, 'RefreshBagData', true) then
-                Bag:RefreshBagData()
-            elseif CheckObjectContainsField(Bag, 'Refresh', true) then
-                Bag:Refresh()
-            end
-        end
-    end
-end
-
-function UGC_Equip_Basics_Main_UIBP:OnUpdateBagItem(Widget, Index)
-    if not Widget then
-        return
-    end
-    local Data = self.BagItems and self.BagItems[Index + 1]
-    if not Data then
-        Data = self.BagItems and self.BagItems[Index]
-    end
-    if not Data then
-        return
-    end
-    local SlotIdx = Data.SlotIdx
-    local Level = 0
-    if SlotIdx then
-        Level = EquipSlotSystem.GetSlotLevel(self:GetLocalPlayerState(), SlotIdx, self:GetLocalPlayerPawn())
-    end
-    local SlotDef = SlotIdx and EquipSlotSystem.GetSlotDef(SlotIdx) or nil
-    EquipUIHelper.ApplyIconItem(Widget, Data.ItemID, Level, SlotDef and SlotDef.Name or '', Data.bEquipped)
-    self:BindBagItemClick(Widget, Data)
-end
-
-function UGC_Equip_Basics_Main_UIBP:BindBagItemClick(Widget, Data)
-    if not Widget or not Data then
-        return
-    end
-    local Key = tostring(Widget)
-    self.BagClickData = self.BagClickData or {}
-    self.BagClickBound = self.BagClickBound or {}
-    self.BagClickData[Key] = Data
-    if self.BagClickBound[Key] then
-        return
-    end
-    local DragDrop = Widget.Common_DragDrop_Item
-    if not DragDrop then
-        return
-    end
-    local WeakSelf = WeakObjectPtr(self)
-    local WeakWidget = WeakObjectPtr(Widget)
-    local OK = pcall(function()
-        DragDrop.OnDragClicked:Add(function()
-            if not WeakSelf:IsValid() or not WeakWidget:IsValid() then
-                return
-            end
-            local SelfRef = WeakSelf:Get()
-            local ItemWidget = WeakWidget:Get()
-            local ClickData = SelfRef and SelfRef.BagClickData and SelfRef.BagClickData[tostring(ItemWidget)]
-            if not SelfRef or not ClickData or not ClickData.SlotIdx then
-                print('[EquipBasics] bag item 无法映射到六槽，忽略')
-                return
-            end
-            print(string.format('[EquipBasics] bag click ItemID=%s SlotIdx=%s equipped=%s',
-                tostring(ClickData.ItemID), tostring(ClickData.SlotIdx), tostring(ClickData.bEquipped)))
-            SelfRef:OpenStrengthenPanel(ClickData.SlotIdx)
-        end)
-    end)
-    if OK then
-        self.BagClickBound[Key] = true
-    end
+    local BagItems = EquipSlotSystem.CollectBagEquipItems(PC)
+    self.BagCtrl:ReloadItems(BagItems)
 end
 
 function UGC_Equip_Basics_Main_UIBP:GetLocalPlayerState()
@@ -269,7 +185,6 @@ function UGC_Equip_Basics_Main_UIBP:GetLocalPlayerPawn()
     return nil
 end
 
----绑定六槽位等级属性变化，实时刷新左侧等级显示
 function UGC_Equip_Basics_Main_UIBP:BindSlotLevelAttrs()
     self:UnbindSlotLevelAttrs()
     local PlayerPawn = self:GetLocalPlayerPawn()
@@ -313,22 +228,21 @@ function UGC_Equip_Basics_Main_UIBP:UnbindSlotLevelAttrs()
     self.SlotLevelAttrHandles = {}
 end
 
----开放化接口：InitData（外部容器打开面板时调用）
 function UGC_Equip_Basics_Main_UIBP:InitData(InParams)
     self.InParams = InParams or {}
     self:Refresh()
 end
 
---析构函数，UI销毁时自动调用
 function UGC_Equip_Basics_Main_UIBP:Destruct()
     self:UnbindSlotLevelAttrs()
+    if self.BagCtrl then
+        self.BagCtrl:Clear()
+    end
     self.InParams = nil
     self.StrengthenWidget = nil
     self.bClickBound = false
-    self.bBagListBound = false
-    self.BagItems = {}
-    self.BagClickData = {}
-    self.BagClickBound = {}
+    self.SlotCtrls = {}
+    self.BagCtrl = nil
     self.bInitDoOnce = false
 end
 

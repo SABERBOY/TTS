@@ -21,9 +21,9 @@
 ---  强化对象是"槽位（装备框）"，不是装备本体；等级 1-180，账号内四职业共享，换装不重置。
 ---  成功率 100%；从 L-1 升到 L：金币 = 30+3*L，装备零件 = 1+floor((L-1)/15)。
 ---  执行前预览目标等级、属性增量与完整消耗；请求处理中禁止重复点击（事务幂等由服务端保证）。
----  由 UGC_Equip_Basics_Main_UIBP 点击装备槽后 InitData{SlotIdx, CloseCallback} 打开。
+---  挂在 UGC_Equip_Main_UIBP 左侧，由养成/强化页签或槽位点击 InitData{SlotIdx, CloseCallback} 切入。
 local EquipSlotSystem = require('Script.Common.EquipSlotSystem')
-local EquipUIHelper = require('Script.Common.EquipUIHelper')
+local EquipIconItem = require('Script.Equip.UIBP.Item.UGC_Equip_Icon_Item_UIBP')
 
 local UGC_Equip_Develop_Strengthen_UIBP = {
     bInitDoOnce = false,
@@ -42,6 +42,16 @@ local UGC_Equip_Develop_Strengthen_UIBP = {
     bBasicListBound = false,
     MaterialItems = {},
 }
+
+local function TryGetWidget(Owner, Name)
+    if not Owner or not Name then
+        return nil
+    end
+    if CheckObjectContainsField(Owner, Name, true) then
+        return Owner[Name]
+    end
+    return nil
+end
 
 --安全执行：捕获 Lua 错误并记录（原生崩溃无法捕获，但阶段 print 可定位）
 local function SafeCall(Desc, Fn)
@@ -144,20 +154,43 @@ function UGC_Equip_Develop_Strengthen_UIBP:Refresh()
         Preview.Level, Preview.GoldCost, Preview.PartsCost, Preview.GoldHave,
         tostring(Preview.Maxed), tostring(Preview.Affordable)))
 
-    -- 顶部信息区：槽位名 / 等级 / 属性类型 / 当前累计加成 → 下一级加成 + 当前装备图标
+    -- 顶部信息区：当前装备名(或槽位名) / 等级 / 属性类型 / 品质·品阶上限 / 当前累计加成 → 下一级加成 + 当前装备图标
     SafeCall('GradeItem', function()
         local Grade = self.Equip_Grade_Item
         if Grade then
-            if Grade.TextBlock_IconName then Grade.TextBlock_IconName:SetText(SlotDef.Name .. '槽') end
+            local DefineID, ItemID = Preview.DefineID, Preview.ItemID
+            local Title = SlotDef.Name .. '槽'
+            if ItemID then
+                local ItemName = EquipSlotSystem.GetItemName(DefineID, ItemID)
+                if ItemName ~= '' then
+                    Title = ItemName
+                end
+            end
+            if Grade.TextBlock_IconName then Grade.TextBlock_IconName:SetText(Title) end
             if Grade.TextBlock_Num then Grade.TextBlock_Num:SetText('Lv.' .. tostring(Preview.Level)) end
             if Grade.TextBlock_Part then Grade.TextBlock_Part:SetText(AttrName) end
-            if Grade.TextBlock_Profession then Grade.TextBlock_Profession:SetText('全职业共享') end
-            if Grade.TextBlock_Value then
-                Grade.TextBlock_Value:SetText(string.format('+%d → +%d', Preview.CurBonus, Preview.NextBonus))
+            if Grade.TextBlock_Profession then
+                local Info = '未装备 · 全职业共享'
+                if Preview.Rank then
+                    Info = string.format('%s(%s) · 生效上限 Lv.%d',
+                        EquipSlotSystem.GetQualityName(Preview.Quality), Preview.Rank.Name, Preview.Cap)
+                end
+                Grade.TextBlock_Profession:SetText(Info)
             end
-            local _, ItemID = EquipUIHelper.GetEquippedOnSlot(SlotIdx)
+            if Grade.TextBlock_Value then
+                if Preview.Rank and Preview.CapReached then
+                    -- 槽位等级已超过当前装备品阶上限：继续强化不会立刻生效，提示实际生效值
+                    Grade.TextBlock_Value:SetText(string.format('+%d(生效+%d) → +%d',
+                        Preview.CurBonus, Preview.EffectiveBonus, Preview.NextBonus))
+                else
+                    Grade.TextBlock_Value:SetText(string.format('+%d → +%d', Preview.CurBonus, Preview.NextBonus))
+                end
+            end
             if Grade.Equip_Icon_Item then
-                EquipUIHelper.ApplyIconItem(Grade.Equip_Icon_Item, ItemID, Preview.Level, SlotDef.Name, ItemID ~= nil)
+                local Icon = EquipIconItem.New(Grade.Equip_Icon_Item)
+                if Icon then
+                    Icon:ApplyData(ItemID, Preview.Level, SlotDef.Name, ItemID ~= nil, DefineID)
+                end
             end
         end
     end)
@@ -224,7 +257,7 @@ end
 function UGC_Equip_Develop_Strengthen_UIBP:RefreshBagList()
     self:EnsureBagListBound()
     local PC = UGCGameSystem.GetLocalPlayerController()
-    self.BagItems = EquipUIHelper.CollectBagEquipItems(PC)
+    self.BagItems = EquipSlotSystem.CollectBagEquipItems(PC)
     if self.ReuseList2_Bag then
         pcall(function()
             self.ReuseList2_Bag:Reload(#self.BagItems)
@@ -247,7 +280,10 @@ function UGC_Equip_Develop_Strengthen_UIBP:OnUpdateBagItem(Widget, Index)
         Level = EquipSlotSystem.GetSlotLevel(PlayerState, Data.SlotIdx, PlayerPawn)
     end
     local SlotDef = Data.SlotIdx and EquipSlotSystem.GetSlotDef(Data.SlotIdx) or nil
-    EquipUIHelper.ApplyIconItem(Widget, Data.ItemID, Level, SlotDef and SlotDef.Name or '', Data.bEquipped)
+    local Cell = EquipIconItem.New(Widget)
+    if Cell then
+        Cell:ApplyData(Data.ItemID, Level, SlotDef and SlotDef.Name or '', Data.bEquipped, Data.DefineID)
+    end
     local Key = tostring(Widget)
     self.BagClickData = self.BagClickData or {}
     self.BagClickBound = self.BagClickBound or {}
@@ -286,7 +322,7 @@ function UGC_Equip_Develop_Strengthen_UIBP:RefreshBasicGroup(SlotIdx, SlotDef, P
     if not Group then
         return
     end
-    local Title = EquipUIHelper.TryGetWidget(Group, 'TextBlock_0')
+    local Title = TryGetWidget(Group, 'TextBlock_0')
     if Title then
         Title:SetText('基础属性')
     end
@@ -297,7 +333,16 @@ function UGC_Equip_Develop_Strengthen_UIBP:RefreshBasicGroup(SlotIdx, SlotDef, P
             NewValue = '+' .. tostring(Preview.NextBonus),
         },
     }
-    local Box = EquipUIHelper.TryGetWidget(Group, 'WrapGroupBox_property')
+    -- 有装备时补一行"生效等级"：min(槽位等级, 品阶上限)，让玩家看到品阶截断
+    if Preview.Rank then
+        local NextEffective = math.min(Preview.Target, Preview.Cap)
+        self.BasicItems[#self.BasicItems + 1] = {
+            Name = string.format('生效等级(%s上限%d)', Preview.Rank.Name, Preview.Cap),
+            OldValue = 'Lv.' .. tostring(Preview.EffectiveLevel),
+            NewValue = 'Lv.' .. tostring(NextEffective),
+        }
+    end
+    local Box = TryGetWidget(Group, 'WrapGroupBox_property')
     if not Box then
         return
     end
@@ -322,11 +367,11 @@ function UGC_Equip_Develop_Strengthen_UIBP:OnUpdateBasicItem(Widget, Index)
     if not Data then
         return
     end
-    local NameText = EquipUIHelper.TryGetWidget(Widget, 'TextBlock_AttributeName')
+    local NameText = TryGetWidget(Widget, 'TextBlock_AttributeName')
     if NameText then NameText:SetText(Data.Name) end
-    local OldText = EquipUIHelper.TryGetWidget(Widget, 'TextBlock_Old')
+    local OldText = TryGetWidget(Widget, 'TextBlock_Old')
     if OldText then OldText:SetText(Data.OldValue) end
-    local NewText = EquipUIHelper.TryGetWidget(Widget, 'TextBlock_New')
+    local NewText = TryGetWidget(Widget, 'TextBlock_New')
     if NewText then NewText:SetText(Data.NewValue) end
 end
 
@@ -335,7 +380,7 @@ function UGC_Equip_Develop_Strengthen_UIBP:RefreshMaterialGroup(Preview)
     if not Group then
         return
     end
-    local Title = EquipUIHelper.TryGetWidget(Group, 'TextBlock_0')
+    local Title = TryGetWidget(Group, 'TextBlock_0')
     if Title then
         Title:SetText('升级材料')
     end
@@ -343,7 +388,7 @@ function UGC_Equip_Develop_Strengthen_UIBP:RefreshMaterialGroup(Preview)
         { Have = Preview.GoldHave, Need = Preview.GoldCost },
         { Have = Preview.PartsHave or 0, Need = Preview.PartsCost },
     }
-    local List = EquipUIHelper.TryGetWidget(Group, 'ReuseList2')
+    local List = TryGetWidget(Group, 'ReuseList2')
     if not List then
         return
     end
@@ -369,14 +414,14 @@ function UGC_Equip_Develop_Strengthen_UIBP:OnUpdateMaterialItem(Widget, Index)
         return
     end
     local Enough = (Data.Have or 0) >= (Data.Need or 0)
-    local Switcher = EquipUIHelper.TryGetWidget(Widget, 'WidgetSwitcher_Meterial')
+    local Switcher = TryGetWidget(Widget, 'WidgetSwitcher_Meterial')
     if Switcher then
         pcall(function()
             Switcher:SetActiveWidgetIndex(Enough and 0 or 1)
         end)
     end
     local function SetNamed(Name, Value)
-        local Text = EquipUIHelper.TryGetWidget(Widget, Name)
+        local Text = TryGetWidget(Widget, Name)
         if Text then Text:SetText(tostring(Value)) end
     end
     SetNamed('TextBlock_Hold', Data.Have or 0)

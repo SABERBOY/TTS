@@ -1,11 +1,10 @@
----装备面板打开/关闭（GM 与其它入口共用）
+---装备主页面打开/关闭（GM 与槽位点击共用）
+---入口只创建 UGC_Equip_Main_UIBP，左侧子面板由主页面页签切换，不再单独 Create Basics/Strengthen。
 local EquipPanelManager = {
-    BasicsWidget = nil,
-    StrengthenWidget = nil,
+    MainWidget = nil,
 }
 
-local BASICS_PATH = 'Asset/Blueprint/Prefabs/UI/UGC_Equip_Basics_Main_UIBP.UGC_Equip_Basics_Main_UIBP_C'
-local STRENGTHEN_PATH = 'Asset/Blueprint/Prefabs/UI/UGC_Equip_Develop_Strengthen_UIBP.UGC_Equip_Develop_Strengthen_UIBP_C'
+local MAIN_PATH = 'Asset/Blueprint/Prefabs/UI/UGC_Equip_Main_UIBP.UGC_Equip_Main_UIBP_C'
 local SLOT_NAME = 'UI.UISlot.MainUISlot_High'
 
 local function ResolveWidget(WeakPtr)
@@ -18,81 +17,77 @@ local function ResolveWidget(WeakPtr)
     return nil
 end
 
-function EquipPanelManager.OpenBasics()
-    local Cached = ResolveWidget(EquipPanelManager.BasicsWidget)
+local function ShowAndInit(Widget, InParams)
+    InParams = InParams or {}
+    InParams.CloseCallback = function()
+        EquipPanelManager.Close()
+    end
+    if not UGCWidgetUtility.IsWidgetAddedToSlot(Widget) then
+        UGCWidgetUtility.AddToSlot(Widget, SLOT_NAME, 180)
+    end
+    UGCWidgetUtility.ShowWidget(Widget)
+    if CheckObjectContainsField(Widget, 'InitData', true) then
+        Widget:InitData(InParams)
+    end
+end
+
+function EquipPanelManager.GetMainWidget()
+    return ResolveWidget(EquipPanelManager.MainWidget)
+end
+
+---打开装备主页面。InParams.PageId = basics|strengthen|transform，强化可带 SlotIdx。
+function EquipPanelManager.Open(InParams)
+    InParams = InParams or {}
+    InParams.PageId = InParams.PageId or 'basics'
+    local Cached = EquipPanelManager.GetMainWidget()
     if Cached then
-        if not UGCWidgetUtility.IsWidgetAddedToSlot(Cached) then
-            UGCWidgetUtility.AddToSlot(Cached, SLOT_NAME, 180)
-        end
-        UGCWidgetUtility.ShowWidget(Cached)
-        if CheckObjectContainsField(Cached, 'InitData', true) then
-            Cached:InitData({})
-        end
-        print('[EquipPanel] OpenBasics reuse')
+        ShowAndInit(Cached, InParams)
+        print('[EquipPanel] Open reuse page=' .. tostring(InParams.PageId))
         return
     end
-    local Path = UGCGameSystem.GetUGCResourcesFullPath(BASICS_PATH)
+    local Path = UGCGameSystem.GetUGCResourcesFullPath(MAIN_PATH)
     UGCWidgetUtility.CreateWidgetAsync(Path, function(Widget)
         if not Widget or not UE.IsValid(Widget) then
-            print('[EquipPanel] OpenBasics create failed')
+            print('[EquipPanel] Open create failed')
             return
         end
-        EquipPanelManager.BasicsWidget = WeakObjectPtr(Widget)
-        if not UGCWidgetUtility.IsWidgetAddedToSlot(Widget) then
-            UGCWidgetUtility.AddToSlot(Widget, SLOT_NAME, 180)
-        end
-        UGCWidgetUtility.ShowWidget(Widget)
-        if CheckObjectContainsField(Widget, 'InitData', true) then
-            Widget:InitData({})
-        end
-        print('[EquipPanel] OpenBasics created')
+        EquipPanelManager.MainWidget = WeakObjectPtr(Widget)
+        ShowAndInit(Widget, InParams)
+        print('[EquipPanel] Open created page=' .. tostring(InParams.PageId))
     end)
+end
+
+function EquipPanelManager.Close()
+    local Cached = EquipPanelManager.GetMainWidget()
+    if Cached then
+        UGCWidgetUtility.HideWidget(Cached)
+        print('[EquipPanel] Close')
+    end
+end
+
+---槽位点击 / GM：切到主页面的强化页签，不再单独弹出 Strengthen overlay。
+function EquipPanelManager.OpenStrengthen(SlotIdx)
+    EquipPanelManager.Open({
+        PageId = 'strengthen',
+        SlotIdx = SlotIdx or 1,
+    })
+end
+
+---兼容旧调用名：实际打开主页面装备页签
+function EquipPanelManager.OpenBasics()
+    EquipPanelManager.Open({ PageId = 'basics' })
 end
 
 function EquipPanelManager.CloseBasics()
-    local Cached = ResolveWidget(EquipPanelManager.BasicsWidget)
-    if Cached then
-        UGCWidgetUtility.HideWidget(Cached)
-        print('[EquipPanel] CloseBasics')
-    end
-end
-
-function EquipPanelManager.OpenStrengthen(SlotIdx)
-    SlotIdx = SlotIdx or 1
-    local Cached = ResolveWidget(EquipPanelManager.StrengthenWidget)
-    local function Apply(Widget)
-        if not UGCWidgetUtility.IsWidgetAddedToSlot(Widget) then
-            UGCWidgetUtility.AddToSlot(Widget, SLOT_NAME, 200)
-        end
-        UGCWidgetUtility.ShowWidget(Widget)
-        if CheckObjectContainsField(Widget, 'InitData', true) then
-            Widget:InitData({
-                SlotIdx = SlotIdx,
-                CloseCallback = function()
-                    UGCWidgetUtility.HideWidget(Widget)
-                end,
-            })
-        end
-    end
-    if Cached then
-        Apply(Cached)
-        print('[EquipPanel] OpenStrengthen reuse slot=' .. tostring(SlotIdx))
-        return
-    end
-    local Path = UGCGameSystem.GetUGCResourcesFullPath(STRENGTHEN_PATH)
-    UGCWidgetUtility.CreateWidgetAsync(Path, function(Widget)
-        if not Widget or not UE.IsValid(Widget) then
-            print('[EquipPanel] OpenStrengthen create failed')
-            return
-        end
-        EquipPanelManager.StrengthenWidget = WeakObjectPtr(Widget)
-        Apply(Widget)
-        print('[EquipPanel] OpenStrengthen created slot=' .. tostring(SlotIdx))
-    end)
+    EquipPanelManager.Close()
 end
 
 function EquipPanelManager.GetBasicsWidget()
-    return ResolveWidget(EquipPanelManager.BasicsWidget)
+    local Main = EquipPanelManager.GetMainWidget()
+    if Main and CheckObjectContainsField(Main, 'GetVisibleChild', true) then
+        return Main:GetVisibleChild() or Main
+    end
+    return Main
 end
 
 return EquipPanelManager
