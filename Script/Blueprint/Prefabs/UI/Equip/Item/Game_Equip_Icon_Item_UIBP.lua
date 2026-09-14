@@ -15,8 +15,6 @@
 ---@field TextBlock_Using UTextBlock
 ---@field WidgetSwitcher_Content UWidgetSwitcher
 ---@field WidgetSwitcher_Unusable UWidgetSwitcher
----@field FittingName FText
----@field FittingSketch FSlateBrush
 --Edit Below--
 ---装备槽 / 背包格子图标单元（项目副本 Game_Equip_Icon_Item_UIBP）：
 ---  引擎按资产路径自动绑定本 Lua 类，self 就是控件本身；
@@ -160,12 +158,19 @@ function Game_Equip_Icon_Item_UIBP:SetIcon(ItemID, DefineID)
         return false
     end
     if not ItemID or ItemID == 0 then
+        -- 空格子收起图标：列表复用/卸下装备时不能残留上一件装备的贴图
+        pcall(function()
+            self.Image_DefaultIcon:SetVisibility(ESlateVisibility.Collapsed)
+        end)
         return true
     end
     local PathStr = GetItemIconPath(DefineID, ItemID)
     if not PathStr then
         return false
     end
+    pcall(function()
+        self.Image_DefaultIcon:SetVisibility(ESlateVisibility.SelfHitTestInvisible)
+    end)
     return SetImageBrushFromPath(self.Image_DefaultIcon, PathStr, true)
 end
 

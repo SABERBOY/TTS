@@ -1,6 +1,5 @@
 ---@class Game_Equip_AffixsBar_Item_UIBP_C:UAEUserWidget
 ---@field ReuseList2_Star ReuseList2_C
----@field FittingName FText
 --Edit Below--
 ---词缀条单元（项目副本 Game_Equip_AffixsBar_Item_UIBP）：最小骨架。
 ---说明：引擎原资产 UGC_Equip_AffixsBar_Item_UIBP 会被引擎按类名自动绑定 LostTombAffixsBar

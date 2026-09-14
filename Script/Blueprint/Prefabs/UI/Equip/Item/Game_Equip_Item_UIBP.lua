@@ -10,9 +10,6 @@
 ---@field TextBlock_Num UTextBlock
 ---@field TextBlock_TypeName UTextBlock
 ---@field UGC_Equip_AffixsBar_Item_UIBP Game_Equip_AffixsBar_Item_UIBP_C
----@field Fitting ESlateVisibility
----@field obj_index bool
----@field FittingName FText
 --Edit Below--
 ---武器/大件装备格子（项目副本 Game_Equip_Item_UIBP）：最小骨架。
 ---目前 Basics 的 Equipment_Slot_8/9 只用它显示，无额外逻辑；后续要在这里补 UI 行为。

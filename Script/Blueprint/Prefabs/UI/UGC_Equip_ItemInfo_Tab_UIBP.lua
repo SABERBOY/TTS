@@ -15,26 +15,20 @@
 ---@field TextBlock_IconName UTextBlock
 ---@field TextBlock_Part UTextBlock
 ---@field TextBlock_Profession UTextBlock
----@field UGC_Equip_AffixsBar_Item_UIBP UGC_Equip_AffixsBar_Item_UIBP_C
----@field UGC_Equip_Gem_GroupItem_UIBP UGC_Equip_Gem_GroupItem_UIBP_C
----@field UGC_Equip_Icon_Item_UIBP UGC_Equip_Icon_Item_UIBP_C
----@field UGC_Equip_PropertyTab_UIBP UGC_Equip_PropertyTab_UIBP_C
+---@field UGC_Equip_AffixsBar_Item_UIBP Game_Equip_AffixsBar_Item_UIBP_C
+---@field UGC_Equip_Gem_GroupItem_UIBP Game_Equip_Gem_GroupItem_UIBP_C
+---@field UGC_Equip_Icon_Item_UIBP Game_Equip_Icon_Item_UIBP_C
+---@field UGC_Equip_PropertyTab_UIBP Game_Equip_PropertyTab_UIBP_C
 ---@field WidgetSwitcher_Lock UWidgetSwitcher
 --Edit Below--
 local UGC_Equip_ItemInfo_Tab_UIBP = { bInitDoOnce = false } 
-
 --[==[ Construct
 function UGC_Equip_ItemInfo_Tab_UIBP:Construct()
 	
 end
 -- Construct ]==]
-
 -- function UGC_Equip_ItemInfo_Tab_UIBP:Tick(MyGeometry, InDeltaTime)
-
 -- end
-
 -- function UGC_Equip_ItemInfo_Tab_UIBP:Destruct()
-
 -- end
-
 return UGC_Equip_ItemInfo_Tab_UIBP

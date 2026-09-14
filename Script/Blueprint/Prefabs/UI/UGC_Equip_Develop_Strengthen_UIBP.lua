@@ -1,8 +1,8 @@
 ---@class UGC_Equip_Develop_Strengthen_UIBP_C:UAEUserWidget
 ---@field Common_Currency Common_Currency_UIBP_C
----@field Equip_Basic_GroupItem UGC_Equip_Basic_GroupItem_UIBP_C
----@field Equip_Grade_Item UGC_Equip_Grade_Item_UIBP_C
----@field Equip_Materials_GroupItem UGC_Equip_Materials_GroupItem_UIBP_C
+---@field Equip_Basic_GroupItem Game_Equip_Basic_GroupItem_UIBP_C
+---@field Equip_Grade_Item Game_Equip_Grade_Item_UIBP_C
+---@field Equip_Materials_GroupItem Game_Equip_Materials_GroupItem_UIBP_C
 ---@field Image_Expand UImage
 ---@field NewButton_Insufficient UNewButton
 ---@field NewButton_Limit UNewButton
@@ -22,16 +22,15 @@
 ---  成功率 100%；从 L-1 升到 L：金币 = 30+3*L，装备零件 = 1+floor((L-1)/15)。
 ---  执行前预览目标等级、属性增量与完整消耗；请求处理中禁止重复点击（事务幂等由服务端保证）。
 ---  挂在 UGC_Equip_Main_UIBP 左侧，由养成/强化页签或槽位点击 InitData{SlotIdx, CloseCallback} 切入。
+---  Grade 卡片与背包格子都是项目资产（Game_Equip_*）自带 Lua 类：本面板只准备数据，
+---  渲染/图标/点击由对应子控件的实例方法处理，不再有 New(Widget) 代理。
 local EquipSlotSystem = require('Script.Common.EquipSlotSystem')
-local EquipIconItem = require('Script.Equip.UIBP.Item.UGC_Equip_Icon_Item_UIBP')
-
 local UGC_Equip_Develop_Strengthen_UIBP = {
     bInitDoOnce = false,
     bButtonsBound = false, -- 按钮委托是否已绑定（必须延迟到 InitData 时机，Construct 期绑定会原生崩溃）
     InParams = nil,
     SlotIdx = nil,
     CloseCallback = nil,
-
     -- 请求锁与属性变化刷新（RPC 单向，等级变化由属性复制驱动，无需 Tick）
     bRequesting = false,
     SlotLevelAttrHandle = nil, -- 当前绑定的 EquipSlotLv_* 属性变化委托
@@ -42,7 +41,6 @@ local UGC_Equip_Develop_Strengthen_UIBP = {
     bBasicListBound = false,
     MaterialItems = {},
 }
-
 local function TryGetWidget(Owner, Name)
     if not Owner or not Name then
         return nil
@@ -52,7 +50,6 @@ local function TryGetWidget(Owner, Name)
     end
     return nil
 end
-
 --安全执行：捕获 Lua 错误并记录（原生崩溃无法捕获，但阶段 print 可定位）
 local function SafeCall(Desc, Fn)
     local OK, Err = pcall(Fn)
@@ -61,13 +58,11 @@ local function SafeCall(Desc, Fn)
     end
     return OK
 end
-
 --构造函数，UI创建时自动调用
 function UGC_Equip_Develop_Strengthen_UIBP:Construct()
     print('[EquipStrengthen] Construct')
     self:LuaInit()
 end
-
 --Lua初始化函数
 function UGC_Equip_Develop_Strengthen_UIBP:LuaInit()
     if self.bInitDoOnce then
@@ -75,10 +70,8 @@ function UGC_Equip_Develop_Strengthen_UIBP:LuaInit()
     end
     self.bInitDoOnce = true
     print('[EquipStrengthen] LuaInit begin')
-
     -- 注意：按钮委托绑定不在此处做！Construct 期 NewButton 的内核委托尚未初始化，
     -- 索引 .OnClicked 并 :Add 会触发客户端原生崩溃（已实测）。绑定延迟到 InitData 的 EnsureButtonsBound。
-
     SafeCall('SetTexts', function()
         if self.TextBlock_Submit then self.TextBlock_Submit:SetText('强化') end
         if self.TextBlock_NotEnough then self.TextBlock_NotEnough:SetText('材料不足') end
@@ -86,7 +79,6 @@ function UGC_Equip_Develop_Strengthen_UIBP:LuaInit()
     end)
     print('[EquipStrengthen] LuaInit end')
 end
-
 ---按钮点击绑定（须在控件构造完成后调用，即 InitData 时机）：
 ---NewButton.OnClicked 为 LuaMulticastDelegate，运行时 Add 已实测安全（Broadcast 可触发回调）。
 function UGC_Equip_Develop_Strengthen_UIBP:EnsureButtonsBound()
@@ -119,7 +111,6 @@ function UGC_Equip_Develop_Strengthen_UIBP:EnsureButtonsBound()
         print('[EquipStrengthen] 三个按钮点击已绑定')
     end
 end
-
 ---开放化接口：InitData
 ---@param InParams table {SlotIdx: number 槽位1-6, CloseCallback: function|nil 关闭回调}
 function UGC_Equip_Develop_Strengthen_UIBP:InitData(InParams)
@@ -133,7 +124,6 @@ function UGC_Equip_Develop_Strengthen_UIBP:InitData(InParams)
     self:BindSlotLevelAttr()
     self:Refresh()
 end
-
 ---刷新面板：等级/进度/消耗预览/拥有量/按钮状态
 function UGC_Equip_Develop_Strengthen_UIBP:Refresh()
     local SlotIdx = self.SlotIdx
@@ -145,7 +135,6 @@ function UGC_Equip_Develop_Strengthen_UIBP:Refresh()
         return
     end
     print('[EquipStrengthen] Refresh begin slot=' .. tostring(SlotIdx))
-
     local PlayerState, PlayerPawn = self:GetPlayerStateAndPawn()
     -- 预览下一次 +1 强化的目标等级、属性增量与完整消耗（策划 4.3：执行前必须预览）
     local Preview = EquipSlotSystem.GetStrengthenPreview(PlayerState, PlayerPawn, SlotIdx, 1)
@@ -153,48 +142,47 @@ function UGC_Equip_Develop_Strengthen_UIBP:Refresh()
     print(string.format('[EquipStrengthen] preview lv=%d gold=%d parts=%d have=%d maxed=%s afford=%s',
         Preview.Level, Preview.GoldCost, Preview.PartsCost, Preview.GoldHave,
         tostring(Preview.Maxed), tostring(Preview.Affordable)))
-
-    -- 顶部信息区：当前装备名(或槽位名) / 等级 / 属性类型 / 品质·品阶上限 / 当前累计加成 → 下一级加成 + 当前装备图标
+    -- 顶部信息区交给 Grade 子面板自己渲染（标题/等级/属性类型/品质品阶/属性增量 + 图标）
     SafeCall('GradeItem', function()
         local Grade = self.Equip_Grade_Item
-        if Grade then
-            local DefineID, ItemID = Preview.DefineID, Preview.ItemID
-            local Title = SlotDef.Name .. '槽'
-            if ItemID then
-                local ItemName = EquipSlotSystem.GetItemName(DefineID, ItemID)
-                if ItemName ~= '' then
-                    Title = ItemName
-                end
-            end
-            if Grade.TextBlock_IconName then Grade.TextBlock_IconName:SetText(Title) end
-            if Grade.TextBlock_Num then Grade.TextBlock_Num:SetText('Lv.' .. tostring(Preview.Level)) end
-            if Grade.TextBlock_Part then Grade.TextBlock_Part:SetText(AttrName) end
-            if Grade.TextBlock_Profession then
-                local Info = '未装备 · 全职业共享'
-                if Preview.Rank then
-                    Info = string.format('%s(%s) · 生效上限 Lv.%d',
-                        EquipSlotSystem.GetQualityName(Preview.Quality), Preview.Rank.Name, Preview.Cap)
-                end
-                Grade.TextBlock_Profession:SetText(Info)
-            end
-            if Grade.TextBlock_Value then
-                if Preview.Rank and Preview.CapReached then
-                    -- 槽位等级已超过当前装备品阶上限：继续强化不会立刻生效，提示实际生效值
-                    Grade.TextBlock_Value:SetText(string.format('+%d(生效+%d) → +%d',
-                        Preview.CurBonus, Preview.EffectiveBonus, Preview.NextBonus))
-                else
-                    Grade.TextBlock_Value:SetText(string.format('+%d → +%d', Preview.CurBonus, Preview.NextBonus))
-                end
-            end
-            if Grade.Equip_Icon_Item then
-                local Icon = EquipIconItem.New(Grade.Equip_Icon_Item)
-                if Icon then
-                    Icon:ApplyData(ItemID, Preview.Level, SlotDef.Name, ItemID ~= nil, DefineID)
-                end
+        if not Grade or not Grade.ApplyData then
+            print('[EquipStrengthen] Equip_Grade_Item 缺少 Game_Equip_Grade_Item_UIBP 的 Lua 方法，检查资产类绑定')
+            return
+        end
+        local DefineID, ItemID = Preview.DefineID, Preview.ItemID
+        local Title = SlotDef.Name .. '槽'
+        if ItemID then
+            local ItemName = EquipSlotSystem.GetItemName(DefineID, ItemID)
+            if ItemName ~= '' then
+                Title = ItemName
             end
         end
+        local Profession = '未装备 · 全职业共享'
+        if Preview.Rank then
+            Profession = string.format('%s(%s) · 生效上限 Lv.%d',
+                EquipSlotSystem.GetQualityName(Preview.Quality), Preview.Rank.Name, Preview.Cap)
+        end
+        local ValueText
+        if Preview.Rank and Preview.CapReached then
+            -- 槽位等级已超过当前装备品阶上限：继续强化不会立刻生效，提示实际生效值
+            ValueText = string.format('+%d(生效+%d) → +%d',
+                Preview.CurBonus, Preview.EffectiveBonus, Preview.NextBonus)
+        else
+            ValueText = string.format('+%d → +%d', Preview.CurBonus, Preview.NextBonus)
+        end
+        Grade:ApplyData({
+            Title = Title,
+            Level = Preview.Level,
+            Part = AttrName,
+            Profession = Profession,
+            Value = ValueText,
+            IconLevel = Preview.Level,
+            ItemID = ItemID,
+            DefineID = DefineID,
+            EmptyName = SlotDef.Name,
+            bEquipped = ItemID ~= nil,
+        })
     end)
-
     -- 等级数字与满级进度
     SafeCall('LevelTexts', function()
         if self.TextBlock_Num1 then self.TextBlock_Num1:SetText(tostring(Preview.Level)) end
@@ -204,7 +192,6 @@ function UGC_Equip_Develop_Strengthen_UIBP:Refresh()
         if self.TextBlock_Times then self.TextBlock_Times:SetText(tostring(Preview.GoldCost)) end
         if self.TextBlock_Total then self.TextBlock_Total:SetText(tostring(Preview.PartsCost)) end
     end)
-
     -- 金币拥有量（Common_Currency 子控件金额文本）
     SafeCall('Currency', function()
         local Currency = self.Common_Currency
@@ -212,7 +199,6 @@ function UGC_Equip_Develop_Strengthen_UIBP:Refresh()
             Currency.TextBlock_Currency_Amount:SetText(tostring(Preview.GoldHave))
         end
     end)
-
     -- 按钮状态切换：0=可强化(Submit) / 1=材料不足(Insufficient) / 2=已达上限(Limit)
     SafeCall('BtnSwitcher', function()
         local BtnState = 0
@@ -225,7 +211,6 @@ function UGC_Equip_Develop_Strengthen_UIBP:Refresh()
             self.WidgetSwitcher_Btn:SetActiveWidgetIndex(BtnState)
         end
     end)
-
     -- 属性组/材料组
     SafeCall('GroupItems', function()
         self:RefreshBasicGroup(SlotIdx, SlotDef, Preview, AttrName)
@@ -234,7 +219,6 @@ function UGC_Equip_Develop_Strengthen_UIBP:Refresh()
     self:RefreshBagList()
     print('[EquipStrengthen] Refresh end')
 end
-
 function UGC_Equip_Develop_Strengthen_UIBP:EnsureBagListBound()
     if self.bBagListBound then
         return
@@ -253,7 +237,6 @@ function UGC_Equip_Develop_Strengthen_UIBP:EnsureBagListBound()
         print('[EquipStrengthen] bag list bind failed ' .. tostring(Err))
     end
 end
-
 function UGC_Equip_Develop_Strengthen_UIBP:RefreshBagList()
     self:EnsureBagListBound()
     local PC = UGCGameSystem.GetLocalPlayerController()
@@ -265,7 +248,6 @@ function UGC_Equip_Develop_Strengthen_UIBP:RefreshBagList()
         print('[EquipStrengthen] bag Reload count=' .. tostring(#self.BagItems))
     end
 end
-
 function UGC_Equip_Develop_Strengthen_UIBP:OnUpdateBagItem(Widget, Index)
     if not Widget then
         return
@@ -280,43 +262,38 @@ function UGC_Equip_Develop_Strengthen_UIBP:OnUpdateBagItem(Widget, Index)
         Level = EquipSlotSystem.GetSlotLevel(PlayerState, Data.SlotIdx, PlayerPawn)
     end
     local SlotDef = Data.SlotIdx and EquipSlotSystem.GetSlotDef(Data.SlotIdx) or nil
-    local Cell = EquipIconItem.New(Widget)
-    if Cell then
-        Cell:ApplyData(Data.ItemID, Level, SlotDef and SlotDef.Name or '', Data.bEquipped, Data.DefineID)
-    end
-    local Key = tostring(Widget)
-    self.BagClickData = self.BagClickData or {}
-    self.BagClickBound = self.BagClickBound or {}
-    self.BagClickData[Key] = Data
-    if self.BagClickBound[Key] or not Widget.Common_DragDrop_Item then
+    -- 列表格子是 Game_Equip_Icon_Item_UIBP 实例：绘制与点击都交给格子自己的实例方法
+    if not Widget.ApplyData then
+        print('[EquipStrengthen] 背包格子缺少 Game_Equip_Icon_Item_UIBP 的 Lua 方法，检查 ReuseList2_Bag.ItemClass')
         return
     end
+    Widget:ApplyData(Data.ItemID, Level, SlotDef and SlotDef.Name or '', Data.bEquipped, Data.DefineID)
+
+    -- 点击数据按格子缓存：格子被列表复用时数据会刷新，回调里按 Key 取当前值
+    local Key = tostring(Widget)
+    self.BagClickData = self.BagClickData or {}
+    self.BagClickData[Key] = Data
     local WeakSelf = WeakObjectPtr(self)
-    local WeakWidget = WeakObjectPtr(Widget)
-    local OK = pcall(function()
-        Widget.Common_DragDrop_Item.OnDragClicked:Add(function()
-            if not WeakSelf:IsValid() or not WeakWidget:IsValid() then
-                return
-            end
-            local SelfRef = WeakSelf:Get()
-            local ItemWidget = WeakWidget:Get()
-            local ClickData = SelfRef and SelfRef.BagClickData and SelfRef.BagClickData[tostring(ItemWidget)]
-            if not SelfRef or not ClickData or not ClickData.SlotIdx then
-                return
-            end
-            print(string.format('[EquipStrengthen] bag click ItemID=%s SlotIdx=%s equipped=%s',
-                tostring(ClickData.ItemID), tostring(ClickData.SlotIdx), tostring(ClickData.bEquipped)))
-            SelfRef:InitData({
-                SlotIdx = ClickData.SlotIdx,
-                CloseCallback = SelfRef.CloseCallback,
-            })
-        end)
+    local OK = Widget:BindClick(function()
+        if not WeakSelf:IsValid() then
+            return
+        end
+        local SelfRef = WeakSelf:Get()
+        local ClickData = SelfRef and SelfRef.BagClickData and SelfRef.BagClickData[Key]
+        if not SelfRef or not ClickData or not ClickData.SlotIdx then
+            return
+        end
+        print(string.format('[EquipStrengthen] bag click ItemID=%s SlotIdx=%s equipped=%s',
+            tostring(ClickData.ItemID), tostring(ClickData.SlotIdx), tostring(ClickData.bEquipped)))
+        SelfRef:InitData({
+            SlotIdx = ClickData.SlotIdx,
+            CloseCallback = SelfRef.CloseCallback,
+        })
     end)
-    if OK then
-        self.BagClickBound[Key] = true
+    if not OK then
+        print('[EquipStrengthen] 背包格子点击绑定失败 key=' .. Key)
     end
 end
-
 function UGC_Equip_Develop_Strengthen_UIBP:RefreshBasicGroup(SlotIdx, SlotDef, Preview, AttrName)
     local Group = self.Equip_Basic_GroupItem
     if not Group then
@@ -358,7 +335,6 @@ function UGC_Equip_Develop_Strengthen_UIBP:RefreshBasicGroup(SlotIdx, SlotDef, P
         Box:Reload(#self.BasicItems)
     end)
 end
-
 function UGC_Equip_Develop_Strengthen_UIBP:OnUpdateBasicItem(Widget, Index)
     if not Widget then
         return
@@ -374,7 +350,6 @@ function UGC_Equip_Develop_Strengthen_UIBP:OnUpdateBasicItem(Widget, Index)
     local NewText = TryGetWidget(Widget, 'TextBlock_New')
     if NewText then NewText:SetText(Data.NewValue) end
 end
-
 function UGC_Equip_Develop_Strengthen_UIBP:RefreshMaterialGroup(Preview)
     local Group = self.Equip_Materials_GroupItem
     if not Group then
@@ -404,7 +379,6 @@ function UGC_Equip_Develop_Strengthen_UIBP:RefreshMaterialGroup(Preview)
         List:Reload(#self.MaterialItems)
     end)
 end
-
 function UGC_Equip_Develop_Strengthen_UIBP:OnUpdateMaterialItem(Widget, Index)
     if not Widget then
         return
@@ -429,14 +403,12 @@ function UGC_Equip_Develop_Strengthen_UIBP:OnUpdateMaterialItem(Widget, Index)
     SetNamed('TextBlock_Quantity', Data.Have or 0)
     SetNamed('TextBlock_Need_Quantity', Data.Need or 0)
 end
-
 ---强化按钮：+1 级
 ---策划 4.3 还要求提供 +10 与"升至当前上限"：当前内核面板无对应按钮控件，
 ---数据层已支持批量（StrengthenBatch(10) / StrengthenToCap()），UI 扩展按钮后直接调用即可。
 function UGC_Equip_Develop_Strengthen_UIBP:OnSubmitClicked()
     self:StrengthenBatch(1)
 end
-
 ---批量强化请求（Count 级；服务端事务校验并扣除）
 function UGC_Equip_Develop_Strengthen_UIBP:StrengthenBatch(Count)
     if self.bRequesting then
@@ -454,33 +426,28 @@ function UGC_Equip_Develop_Strengthen_UIBP:StrengthenBatch(Count)
         self:Refresh()
         return
     end
-
     self.bRequesting = true
     self.RequestFromLevel = Preview.Level
     self.RequestElapsed = 0
     print(string.format('[EquipStrengthen] 发起强化请求 slot=%d count=%d from=%d', self.SlotIdx, Count, Preview.Level))
     EquipSlotSystem.ClientRequestStrengthen(self.SlotIdx, Count)
 end
-
 ---升至系统上限（180 级）：预留接口，UI 扩展按钮后绑定
 function UGC_Equip_Develop_Strengthen_UIBP:StrengthenToCap()
     self:StrengthenBatch(EquipSlotSystem.MAX_LEVEL)
 end
-
 function UGC_Equip_Develop_Strengthen_UIBP:OnInsufficientClicked()
     local PlayerState, PlayerPawn = self:GetPlayerStateAndPawn()
     local Preview = EquipSlotSystem.GetStrengthenPreview(PlayerState, PlayerPawn, self.SlotIdx, 1)
     print(string.format('[EquipStrengthen] 材料不足：金币 %d/%d 零件 %d/%d',
         Preview.GoldHave, Preview.GoldCost, Preview.PartsHave, Preview.PartsCost))
 end
-
 function UGC_Equip_Develop_Strengthen_UIBP:OnLimitClicked()
     print('[EquipStrengthen] 槽位已达 180 级上限')
     if self.CloseCallback then
         self.CloseCallback()
     end
 end
-
 ---绑定槽位等级属性变化委托（客户端）：属性复制到达时刷新并解除请求锁
 function UGC_Equip_Develop_Strengthen_UIBP:BindSlotLevelAttr()
     self:UnbindSlotLevelAttr()
@@ -509,7 +476,6 @@ function UGC_Equip_Develop_Strengthen_UIBP:BindSlotLevelAttr()
         print('[EquipStrengthen] 绑定属性变化失败 ' .. tostring(AttrName))
     end
 end
-
 function UGC_Equip_Develop_Strengthen_UIBP:UnbindSlotLevelAttr()
     if not self.SlotLevelAttrHandle then
         return
@@ -523,7 +489,6 @@ function UGC_Equip_Develop_Strengthen_UIBP:UnbindSlotLevelAttr()
     end
     self.SlotLevelAttrHandle = nil
 end
-
 function UGC_Equip_Develop_Strengthen_UIBP:GetPlayerStateAndPawn()
     local PC = UGCGameSystem.GetLocalPlayerController()
     if not PC then
@@ -533,7 +498,6 @@ function UGC_Equip_Develop_Strengthen_UIBP:GetPlayerStateAndPawn()
     local PlayerPawn = CheckObjectContainsField(PC, 'GetPlayerCharacterSafety', true) and PC:GetPlayerCharacterSafety() or nil
     return PlayerState, PlayerPawn
 end
-
 --析构函数，UI销毁时自动调用
 function UGC_Equip_Develop_Strengthen_UIBP:Destruct()
     SafeCall('UnbindButtons', function()
@@ -558,12 +522,10 @@ function UGC_Equip_Develop_Strengthen_UIBP:Destruct()
     self.bBagListBound = false
     self.BagItems = {}
     self.BagClickData = {}
-    self.BagClickBound = {}
     self.bMaterialListBound = false
     self.bBasicListBound = false
     self.MaterialItems = {}
     self.BasicItems = {}
     self.bInitDoOnce = false
 end
-
 return UGC_Equip_Develop_Strengthen_UIBP

@@ -1,15 +1,15 @@
 ---@class Game_Equip_Grade_Item_UIBP_C:UAEUserWidget
----@field Image_Bg UImage
 ---@field CanvasPanel_Icon UCanvasPanel
 ---@field Equip_Icon_Item Game_Equip_Icon_Item_UIBP_C
+---@field Image_Bg UImage
+---@field Image_Lock UImage
+---@field Image_UnLock UImage
 ---@field TextBlock_IconName UTextBlock
 ---@field TextBlock_Num UTextBlock
 ---@field TextBlock_Part UTextBlock
 ---@field TextBlock_Profession UTextBlock
 ---@field TextBlock_Value UTextBlock
 ---@field WidgetSwitcher_Lock UWidgetSwitcher
----@field Image_Lock UImage
----@field Image_UnLock UImage
 --Edit Below--
 ---强化页顶部装备卡片（项目副本 Game_Equip_Grade_Item_UIBP）：
 ---  自己负责标题/等级/属性类型/品质品阶文案/属性增量的显示，以及内嵌图标的刷新；
