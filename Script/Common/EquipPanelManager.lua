@@ -1,10 +1,10 @@
 ---装备主页面打开/关闭（GM 与槽位点击共用）
----入口只创建 UGC_Equip_Main_UIBP，左侧子面板由主页面页签切换，不再单独 Create Basics/Strengthen。
+---入口只创建 Game_Equip_Main_UIBP，左侧子面板由主页面页签切换，不再单独 Create Basics/Strengthen。
 local EquipPanelManager = {
     MainWidget = nil,
 }
 
-local MAIN_PATH = 'Asset/Blueprint/Prefabs/UI/UGC_Equip_Main_UIBP.UGC_Equip_Main_UIBP_C'
+local MAIN_PATH = 'Asset/Blueprint/Prefabs/UI/Equip/UIBP/Game_Equip_Main_UIBP.Game_Equip_Main_UIBP_C'
 local SLOT_NAME = 'UI.UISlot.MainUISlot_High'
 
 local function ResolveWidget(WeakPtr)

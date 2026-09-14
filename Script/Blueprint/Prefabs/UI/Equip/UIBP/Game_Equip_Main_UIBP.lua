@@ -1,4 +1,4 @@
----@class UGC_Equip_Main_UIBP_C:UAEUserWidget
+---@class Game_Equip_Main_UIBP_C:UAEUserWidget
 ---@field CanvasPanel_Tab2 UCanvasPanel
 ---@field Common_DragDrop_Common Common_DragDrop_Item_C
 ---@field Currency_1 Common_Currency_UIBP_C
@@ -10,9 +10,9 @@
 ---@field ReuseList2_Level2 ReuseList2_C
 ---@field ScaleBox_IPX UScaleBox
 ---@field TextBlock_Title UTextBlock
----@field UGC_Equip_Basics_Main_UIBP_7 UGC_Equip_Basics_Main_UIBP_C
----@field UGC_Equip_Develop_Strengthen_UIBP UGC_Equip_Develop_Strengthen_UIBP_C
----@field UGC_Equip_Develop_Transform_UIBP UGC_Equip_Develop_Transform_UIBP_C
+---@field UGC_Equip_Basics_Main_UIBP_7 Game_Equip_Basics_Main_UIBP_C
+---@field UGC_Equip_Develop_Strengthen_UIBP Game_Equip_Develop_Strengthen_UIBP_C
+---@field UGC_Equip_Develop_Transform_UIBP Game_Equip_Develop_Transform_UIBP_C
 --Edit Below--
 ---装备主页面：右侧两级页签切换左侧已挂载的装备/强化/转化面板。
 ---  一级：装备 / 养成；养成下二级：强化 / 转化。
@@ -48,7 +48,7 @@ local PAGE_TITLE = {
 local LEVEL1_ITEM_CLASS = '/Game/UGC/UITemplate/Asset/Equip/UIBP/Item/UGC_Equip_Level1_Tabs_UIBP.UGC_Equip_Level1_Tabs_UIBP_C'
 local LEVEL2_ITEM_CLASS = '/Game/UGC/UITemplate/Asset/Equip/UIBP/Item/UGC_Equip_Level2_Tabs_UIBP.UGC_Equip_Level2_Tabs_UIBP_C'
 
-local UGC_Equip_Main_UIBP = {
+local Game_Equip_Main_UIBP = {
     bInitDoOnce = false,
     bCloseBound = false,
     bTabListsBound = false,
@@ -127,11 +127,11 @@ local function ApplyTabItem(Widget, Title, bSelected)
     end
 end
 
-function UGC_Equip_Main_UIBP:Construct()
+function Game_Equip_Main_UIBP:Construct()
     self:LuaInit()
 end
 
-function UGC_Equip_Main_UIBP:LuaInit()
+function Game_Equip_Main_UIBP:LuaInit()
     if self.bInitDoOnce then
         return
     end
@@ -153,22 +153,22 @@ function UGC_Equip_Main_UIBP:LuaInit()
     print('[EquipMain] LuaInit end')
 end
 
-function UGC_Equip_Main_UIBP:GetPageWidget(PageId)
+function Game_Equip_Main_UIBP:GetPageWidget(PageId)
     local Name = PAGE_WIDGET_NAME[PageId]
     return Name and self[Name] or nil
 end
 
-function UGC_Equip_Main_UIBP:GetVisibleChild()
+function Game_Equip_Main_UIBP:GetVisibleChild()
     return self:GetPageWidget(self.PageId)
 end
 
-function UGC_Equip_Main_UIBP:ApplyPageVisibility(PageId)
+function Game_Equip_Main_UIBP:ApplyPageVisibility(PageId)
     for Id, Name in pairs(PAGE_WIDGET_NAME) do
         SetWidgetVisible(self[Name], Id == PageId)
     end
 end
 
-function UGC_Equip_Main_UIBP:EnsureCloseBound()
+function Game_Equip_Main_UIBP:EnsureCloseBound()
     if self.bCloseBound then
         return
     end
@@ -188,7 +188,7 @@ function UGC_Equip_Main_UIBP:EnsureCloseBound()
     end
 end
 
-function UGC_Equip_Main_UIBP:EnsureTabListsBound()
+function Game_Equip_Main_UIBP:EnsureTabListsBound()
     if self.bTabListsBound then
         return
     end
@@ -223,7 +223,7 @@ function UGC_Equip_Main_UIBP:EnsureTabListsBound()
     end
 end
 
-function UGC_Equip_Main_UIBP:EnsureItemClass(List, ClassPath, Tag)
+function Game_Equip_Main_UIBP:EnsureItemClass(List, ClassPath, Tag)
     if not List or List.ItemClass or not ClassPath then
         return
     end
@@ -245,7 +245,7 @@ function UGC_Equip_Main_UIBP:EnsureItemClass(List, ClassPath, Tag)
     end)
 end
 
-function UGC_Equip_Main_UIBP:ReloadTabs()
+function Game_Equip_Main_UIBP:ReloadTabs()
     if self.ReuseList2_Level1 then
         self:EnsureItemClass(self.ReuseList2_Level1, LEVEL1_ITEM_CLASS, 'Level1')
         if self.ReuseList2_Level1.ItemClass then
@@ -261,7 +261,7 @@ function UGC_Equip_Main_UIBP:ReloadTabs()
     end
 end
 
-function UGC_Equip_Main_UIBP:BindTabClick(Widget, Kind, LuaIdx)
+function Game_Equip_Main_UIBP:BindTabClick(Widget, Kind, LuaIdx)
     if not Widget then
         return
     end
@@ -305,7 +305,7 @@ function UGC_Equip_Main_UIBP:BindTabClick(Widget, Kind, LuaIdx)
     end
 end
 
-function UGC_Equip_Main_UIBP:OnUpdateLevel1Item(Widget, Idx)
+function Game_Equip_Main_UIBP:OnUpdateLevel1Item(Widget, Idx)
     local LuaIdx = Idx + 1
     local Tab = LEVEL1_TABS[LuaIdx]
     if not Tab then
@@ -315,7 +315,7 @@ function UGC_Equip_Main_UIBP:OnUpdateLevel1Item(Widget, Idx)
     self:BindTabClick(Widget, 'l1', LuaIdx)
 end
 
-function UGC_Equip_Main_UIBP:OnUpdateLevel2Item(Widget, Idx)
+function Game_Equip_Main_UIBP:OnUpdateLevel2Item(Widget, Idx)
     local LuaIdx = Idx + 1
     local Tab = LEVEL2_DEVELOP[LuaIdx]
     if not Tab then
@@ -325,7 +325,7 @@ function UGC_Equip_Main_UIBP:OnUpdateLevel2Item(Widget, Idx)
     self:BindTabClick(Widget, 'l2', LuaIdx)
 end
 
-function UGC_Equip_Main_UIBP:OnLevel1Clicked(LuaIdx)
+function Game_Equip_Main_UIBP:OnLevel1Clicked(LuaIdx)
     local Tab = LEVEL1_TABS[LuaIdx]
     if not Tab then
         return
@@ -338,7 +338,7 @@ function UGC_Equip_Main_UIBP:OnLevel1Clicked(LuaIdx)
     end
 end
 
-function UGC_Equip_Main_UIBP:OnLevel2Clicked(LuaIdx)
+function Game_Equip_Main_UIBP:OnLevel2Clicked(LuaIdx)
     local Tab = LEVEL2_DEVELOP[LuaIdx]
     if not Tab then
         return
@@ -347,7 +347,7 @@ function UGC_Equip_Main_UIBP:OnLevel2Clicked(LuaIdx)
     self:SwitchToPage(Tab.Page)
 end
 
-function UGC_Equip_Main_UIBP:SyncTabIndexByPage(PageId)
+function Game_Equip_Main_UIBP:SyncTabIndexByPage(PageId)
     if PageId == PAGE_BASICS then
         self.Level1Idx = 1
         return
@@ -362,7 +362,7 @@ function UGC_Equip_Main_UIBP:SyncTabIndexByPage(PageId)
     end
 end
 
-function UGC_Equip_Main_UIBP:SwitchToPage(PageId, Extra)
+function Game_Equip_Main_UIBP:SwitchToPage(PageId, Extra)
     Extra = Extra or {}
     PageId = PageId or PAGE_BASICS
     if not PAGE_WIDGET_NAME[PageId] then
@@ -402,7 +402,7 @@ function UGC_Equip_Main_UIBP:SwitchToPage(PageId, Extra)
     print('[EquipMain] SwitchToPage ' .. tostring(PageId) .. ' slot=' .. tostring(self.StrengthenSlotIdx))
 end
 
-function UGC_Equip_Main_UIBP:RefreshCurrencies()
+function Game_Equip_Main_UIBP:RefreshCurrencies()
     local OK, Err = pcall(function()
         local PC = UGCGameSystem.GetLocalPlayerController()
         local IDs = nil
@@ -435,7 +435,7 @@ function UGC_Equip_Main_UIBP:RefreshCurrencies()
     end
 end
 
-function UGC_Equip_Main_UIBP:Refresh()
+function Game_Equip_Main_UIBP:Refresh()
     self:RefreshCurrencies()
     local Child = self:GetVisibleChild()
     if Child and CheckObjectContainsField(Child, 'Refresh', true) then
@@ -444,7 +444,7 @@ function UGC_Equip_Main_UIBP:Refresh()
     self:ReloadTabs()
 end
 
-function UGC_Equip_Main_UIBP:InitData(InParams)
+function Game_Equip_Main_UIBP:InitData(InParams)
     InParams = InParams or {}
     self.InParams = InParams
     print('[EquipMain] InitData page=' .. tostring(InParams.PageId) .. ' slot=' .. tostring(InParams.SlotIdx))
@@ -453,7 +453,7 @@ function UGC_Equip_Main_UIBP:InitData(InParams)
     self:SwitchToPage(InParams.PageId or PAGE_BASICS, InParams)
 end
 
-function UGC_Equip_Main_UIBP:OnCloseClicked()
+function Game_Equip_Main_UIBP:OnCloseClicked()
     print('[EquipMain] close')
     if self.InParams and self.InParams.CloseCallback then
         self.InParams.CloseCallback()
@@ -462,7 +462,7 @@ function UGC_Equip_Main_UIBP:OnCloseClicked()
     UGCWidgetUtility.HideWidget(self)
 end
 
-function UGC_Equip_Main_UIBP:Destruct()
+function Game_Equip_Main_UIBP:Destruct()
     if self.ReuseList2_Level1 then
         pcall(function()
             self.ReuseList2_Level1.OnUpdateItem:Remove(self.OnUpdateLevel1Item, self)
@@ -482,4 +482,4 @@ function UGC_Equip_Main_UIBP:Destruct()
     print('[EquipMain] Destruct')
 end
 
-return UGC_Equip_Main_UIBP
+return Game_Equip_Main_UIBP

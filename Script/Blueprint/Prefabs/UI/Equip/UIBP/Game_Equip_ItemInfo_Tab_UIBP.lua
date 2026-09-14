@@ -1,4 +1,4 @@
----@class UGC_Equip_ItemInfo_Tab_UIBP_C:UAEUserWidget
+---@class Game_Equip_ItemInfo_Tab_UIBP_C:UAEUserWidget
 ---@field Btn_dismantle UGC_Equip_Btn_UIBP_C
 ---@field Btn_More UGC_Equip_Btn_UIBP_C
 ---@field Btn_Wear UGC_Equip_Btn_UIBP_C
@@ -21,14 +21,14 @@
 ---@field UGC_Equip_PropertyTab_UIBP Game_Equip_PropertyTab_UIBP_C
 ---@field WidgetSwitcher_Lock UWidgetSwitcher
 --Edit Below--
-local UGC_Equip_ItemInfo_Tab_UIBP = { bInitDoOnce = false } 
+local Game_Equip_ItemInfo_Tab_UIBP = { bInitDoOnce = false } 
 --[==[ Construct
-function UGC_Equip_ItemInfo_Tab_UIBP:Construct()
+function Game_Equip_ItemInfo_Tab_UIBP:Construct()
 	
 end
 -- Construct ]==]
--- function UGC_Equip_ItemInfo_Tab_UIBP:Tick(MyGeometry, InDeltaTime)
+-- function Game_Equip_ItemInfo_Tab_UIBP:Tick(MyGeometry, InDeltaTime)
 -- end
--- function UGC_Equip_ItemInfo_Tab_UIBP:Destruct()
+-- function Game_Equip_ItemInfo_Tab_UIBP:Destruct()
 -- end
-return UGC_Equip_ItemInfo_Tab_UIBP
+return Game_Equip_ItemInfo_Tab_UIBP

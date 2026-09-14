@@ -4,7 +4,7 @@ local BP_BackpackUIComponentV2_Custom = {}
 local EquipSlotAttrApplier = require('Script.Common.EquipSlotAttrApplier')
 
 local COMMON_PREFIX = "EquipmentSlot.Common."
-local DETAIL_WIDGET_PATH = "Asset/Blueprint/Prefabs/UI/UGC_ItemDetail_UIBP.UGC_ItemDetail_UIBP_C"
+local DETAIL_WIDGET_PATH = "Asset/Blueprint/Prefabs/UI/Equip/UIBP/Game_ItemDetail_UIBP.Game_ItemDetail_UIBP_C"
 local EQUIP_PANEL_PATH = "/Game/UGC/UITemplate/Asset/Backpack/Arts_UI/UIBP/UGC_Backpack_OpenAPI/UGC_WeaponEquip_Open_UIBP.UGC_WeaponEquip_Open_UIBP_C"
 local SLOT_WIDGET_PATHS = {
     "/Game/UGC/UITemplate/Asset/Backpack/Arts_UI/UIBP/UGC_Backpack_OpenAPI/UGC_BodyEquipSlot_Open_UIBP.UGC_BodyEquipSlot_Open_UIBP_C",
@@ -177,7 +177,7 @@ function BP_BackpackUIComponentV2_Custom:ShowCommonEquipDetail(SlotName, ItemDef
     local Owner = self
     UGCWidgetUtility.CreateWidgetAsync(Path, function(Widget)
         if not Widget then
-            print("[EquipClick] failed to create UGC_ItemDetail_UIBP")
+            print("[EquipClick] failed to create Game_ItemDetail_UIBP")
             return
         end
         Owner.EquipDetailWidget = Widget

@@ -1,4 +1,4 @@
----@class UGC_Equip_Develop_Transform_UIBP_C:UAEUserWidget
+---@class Game_Equip_Develop_Transform_UIBP_C:UAEUserWidget
 ---@field Common_Currency Common_Currency_UIBP_C
 ---@field Develop_Icon_0 UGC_Equip_Develop_Icon_Item_UIBP_C
 ---@field Develop_Icon_1 UGC_Equip_Materials_Item_UIBP_C
@@ -18,14 +18,14 @@
 ---@field TextBlock_Choose UTextBlock
 ---@field TextBlock_Grade UTextBlock
 --Edit Below--
----装备转化面板（占位）：由 UGC_Equip_Main_UIBP 二级页签切入，玩法逻辑后续再接。
-local UGC_Equip_Develop_Transform_UIBP = { bInitDoOnce = false }
+---装备转化面板（占位）：由 Game_Equip_Main_UIBP 二级页签切入，玩法逻辑后续再接。
+local Game_Equip_Develop_Transform_UIBP = { bInitDoOnce = false }
 
-function UGC_Equip_Develop_Transform_UIBP:Construct()
+function Game_Equip_Develop_Transform_UIBP:Construct()
     self:LuaInit()
 end
 
-function UGC_Equip_Develop_Transform_UIBP:LuaInit()
+function Game_Equip_Develop_Transform_UIBP:LuaInit()
     if self.bInitDoOnce then
         return
     end
@@ -39,14 +39,14 @@ function UGC_Equip_Develop_Transform_UIBP:LuaInit()
     end
 end
 
-function UGC_Equip_Develop_Transform_UIBP:InitData(InParams)
+function Game_Equip_Develop_Transform_UIBP:InitData(InParams)
     self.InParams = InParams or {}
     print('[EquipTransform] InitData')
 end
 
-function UGC_Equip_Develop_Transform_UIBP:Destruct()
+function Game_Equip_Develop_Transform_UIBP:Destruct()
     self.InParams = nil
     self.bInitDoOnce = false
 end
 
-return UGC_Equip_Develop_Transform_UIBP
+return Game_Equip_Develop_Transform_UIBP

@@ -21,7 +21,7 @@ function UGCGM:Register(DebugUI)
 
     CurFuncList["装备系统"] = {
         ["面板"] = {
-            {UGCGMUI.ItemTypeEnum.Button, {{"打开装备面板"}, {"打开 UGC_Equip_Main_UIBP：右侧页签切换装备/强化/转化"}}, "C_OpenEquipPanel"},
+            {UGCGMUI.ItemTypeEnum.Button, {{"打开装备面板"}, {"打开 Game_Equip_Main_UIBP：右侧页签切换装备/强化/转化"}}, "C_OpenEquipPanel"},
             {UGCGMUI.ItemTypeEnum.Button, {{"关闭装备面板"}, {"隐藏装备主页面"}}, "C_CloseEquipPanel"},
             {UGCGMUI.ItemTypeEnum.Button, {{"打开头盔强化面板"}, {"打开装备主页面并切到头盔槽强化页签"}}, "C_OpenHelmetStrengthen"},
         },

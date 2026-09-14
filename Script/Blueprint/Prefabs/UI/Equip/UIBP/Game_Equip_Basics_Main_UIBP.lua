@@ -1,4 +1,4 @@
----@class UGC_Equip_Basics_Main_UIBP_C:UAEUserWidget
+---@class Game_Equip_Basics_Main_UIBP_C:UAEUserWidget
 ---@field Common_DragDrop_Armor Common_DragDrop_Item_C
 ---@field Common_DragDrop_Common Common_DragDrop_Item_C
 ---@field Equipment_Slot_0 Game_Equip_Icon_Item_UIBP_C
@@ -15,7 +15,7 @@
 ---@field UGC_Equip_Bag_UIBP Game_Equip_Bag_UIBP_C
 --Edit Below--
 ---装备显示面板（装备系统）：
----  挂在 UGC_Equip_Main_UIBP 左侧；不再作为独立页面打开。
+---  挂在 Game_Equip_Main_UIBP 左侧；不再作为独立页面打开。
 ---  左侧 = 玩家当前已装备的六槽位（头盔/衣服/首饰/手套/腰带/鞋子），显示各槽位永久强化等级；
 ---  右侧 = 背包装备列表（子面板 Game_Equip_Bag_UIBP 承载）。
 ---  点击装备槽切到主页面强化页签，强化的是槽位而非装备本体。
@@ -23,7 +23,7 @@
 ---  槽位/背包的显示与点击由对应子控件自己的实例方法负责，不再有 New(Widget) 代理。
 local EquipSlotSystem = require('Script.Common.EquipSlotSystem')
 local EquipPanelManager = require('Script.Common.EquipPanelManager')
-local UGC_Equip_Basics_Main_UIBP = {
+local Game_Equip_Basics_Main_UIBP = {
     bInitDoOnce = false,
     bSlotWidgetsReady = false,
     bSlotWarned = false,
@@ -43,10 +43,10 @@ local SLOT_WIDGET_MAP = {
 }
 -- 未映射到六槽的两个大格子（中间两个），隐藏；注意要与 SLOT_WIDGET_MAP 互补，别把已映射的槽藏掉
 local SPARE_SLOT_WIDGETS = { 'Equipment_Slot_0', 'Equipment_Slot_3' }
-function UGC_Equip_Basics_Main_UIBP:Construct()
+function Game_Equip_Basics_Main_UIBP:Construct()
     self:LuaInit()
 end
-function UGC_Equip_Basics_Main_UIBP:LuaInit()
+function Game_Equip_Basics_Main_UIBP:LuaInit()
     if self.bInitDoOnce then
         return
     end
@@ -67,7 +67,7 @@ function UGC_Equip_Basics_Main_UIBP:LuaInit()
 end
 ---六槽控件是真实 Game_Equip_Icon_Item_UIBP 实例：只负责显示槽位与绑定点击。
 ---绑定是幂等的（子控件的 BindClick 自己防重复）；未绑定成功时下次 Refresh 会重试。
-function UGC_Equip_Basics_Main_UIBP:EnsureSlotWidgets()
+function Game_Equip_Basics_Main_UIBP:EnsureSlotWidgets()
     if self.bSlotWidgetsReady then
         return
     end
@@ -106,7 +106,7 @@ function UGC_Equip_Basics_Main_UIBP:EnsureSlotWidgets()
         print('[EquipBasics] 六槽位点击已绑定')
     end
 end
-function UGC_Equip_Basics_Main_UIBP:OnSlotClicked(SlotIdx)
+function Game_Equip_Basics_Main_UIBP:OnSlotClicked(SlotIdx)
     local DefineID, ItemID = EquipSlotSystem.GetEquippedOnSlot(SlotIdx)
     print(string.format('[EquipBasics] OnSlotClicked SlotIdx=%s ItemID=%s', tostring(SlotIdx), tostring(ItemID)))
     if not ItemID then
@@ -114,10 +114,10 @@ function UGC_Equip_Basics_Main_UIBP:OnSlotClicked(SlotIdx)
     end
     self:OpenStrengthenPanel(SlotIdx)
 end
-function UGC_Equip_Basics_Main_UIBP:OpenStrengthenPanel(SlotIdx)
+function Game_Equip_Basics_Main_UIBP:OpenStrengthenPanel(SlotIdx)
     EquipPanelManager.OpenStrengthen(SlotIdx)
 end
-function UGC_Equip_Basics_Main_UIBP:Refresh()
+function Game_Equip_Basics_Main_UIBP:Refresh()
     self:EnsureSlotWidgets()
     self:BindSlotLevelAttrs()
     EquipSlotSystem.BindAttachChange(self, function(SelfRef)
@@ -137,7 +137,7 @@ function UGC_Equip_Basics_Main_UIBP:Refresh()
     end
     self:RefreshBagList()
 end
-function UGC_Equip_Basics_Main_UIBP:RefreshBagList()
+function Game_Equip_Basics_Main_UIBP:RefreshBagList()
     local Bag = self.UGC_Equip_Bag_UIBP
     if not Bag or not Bag.ReloadItems then
         return
@@ -145,21 +145,21 @@ function UGC_Equip_Basics_Main_UIBP:RefreshBagList()
     local PC = UGCGameSystem.GetLocalPlayerController()
     Bag:ReloadItems(EquipSlotSystem.CollectBagEquipItems(PC))
 end
-function UGC_Equip_Basics_Main_UIBP:GetLocalPlayerState()
+function Game_Equip_Basics_Main_UIBP:GetLocalPlayerState()
     local PC = UGCGameSystem.GetLocalPlayerController()
     if PC and CheckObjectContainsField(PC, 'GetCurPlayerState', true) then
         return PC:GetCurPlayerState()
     end
     return nil
 end
-function UGC_Equip_Basics_Main_UIBP:GetLocalPlayerPawn()
+function Game_Equip_Basics_Main_UIBP:GetLocalPlayerPawn()
     local PC = UGCGameSystem.GetLocalPlayerController()
     if PC and CheckObjectContainsField(PC, 'GetPlayerCharacterSafety', true) then
         return PC:GetPlayerCharacterSafety()
     end
     return nil
 end
-function UGC_Equip_Basics_Main_UIBP:BindSlotLevelAttrs()
+function Game_Equip_Basics_Main_UIBP:BindSlotLevelAttrs()
     self:UnbindSlotLevelAttrs()
     local PlayerPawn = self:GetLocalPlayerPawn()
     if not PlayerPawn then
@@ -184,7 +184,7 @@ function UGC_Equip_Basics_Main_UIBP:BindSlotLevelAttrs()
         end
     end
 end
-function UGC_Equip_Basics_Main_UIBP:UnbindSlotLevelAttrs()
+function Game_Equip_Basics_Main_UIBP:UnbindSlotLevelAttrs()
     local PlayerPawn = self:GetLocalPlayerPawn()
     if not PlayerPawn then
         self.SlotLevelAttrHandles = {}
@@ -200,11 +200,11 @@ function UGC_Equip_Basics_Main_UIBP:UnbindSlotLevelAttrs()
     end
     self.SlotLevelAttrHandles = {}
 end
-function UGC_Equip_Basics_Main_UIBP:InitData(InParams)
+function Game_Equip_Basics_Main_UIBP:InitData(InParams)
     self.InParams = InParams or {}
     self:Refresh()
 end
-function UGC_Equip_Basics_Main_UIBP:Destruct()
+function Game_Equip_Basics_Main_UIBP:Destruct()
     self:UnbindSlotLevelAttrs()
     -- 背包子面板 / 六槽控件会收到自己的 Destruct，这里只清本面板状态
     self.InParams = nil
@@ -213,4 +213,4 @@ function UGC_Equip_Basics_Main_UIBP:Destruct()
     self.bSlotWarned = false
     self.bInitDoOnce = false
 end
-return UGC_Equip_Basics_Main_UIBP
+return Game_Equip_Basics_Main_UIBP

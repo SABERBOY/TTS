@@ -1,0 +1,8 @@
+TTS/Script/Blueprint/Prefabs/UI/Game_Equip_Develop_Transform_UIBP.lua
+TTS/Script/Blueprint/Prefabs/UI/Game_Equip_Basics_Main_UIBP.lua
+TTS/Script/Blueprint/Prefabs/UI/Game_EquipmentDetail_UIBP.lua
+TTS/Script/Blueprint/Prefabs/UI/Game_Equip_Develop_Strengthen_UIBP.lua
+TTS/Script/Blueprint/Prefabs/UI/Game_Equip_AttributeTab_UIBP.lua
+TTS/Script/Blueprint/Prefabs/UI/Game_Equip_ItemInfo_Tab_UIBP.lua
+TTS/Script/Blueprint/Prefabs/UI/Game_Equip_Main_UIBP.lua
+TTS/Script/Blueprint/Prefabs/UI/Game_ItemDetail_UIBP.lua

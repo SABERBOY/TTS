@@ -1,4 +1,4 @@
----@class UGC_ItemDetail_UIBP_C:UAEUserWidget
+---@class Game_ItemDetail_UIBP_C:UAEUserWidget
 ---@field Button_CLose UButton
 ---@field Button_Contrast UButton
 ---@field Button_Mask UButton
@@ -42,7 +42,7 @@
 ---@field WidgetSwitcher_Weapon UWidgetSwitcher
 ---@field MaxHeightDesizedSize float
 --Edit Below--
-local UGC_ItemDetail_UIBP =
+local Game_ItemDetail_UIBP =
 {
 
     bInitDoOnce = false,
@@ -77,13 +77,13 @@ local UGC_ItemDetail_UIBP =
 
 
 --构造函数，UI创建时自动调用
-function UGC_ItemDetail_UIBP:Construct()
+function Game_ItemDetail_UIBP:Construct()
     self:LuaInit()
 end
 
 
 --Lua初始化函数
-function UGC_ItemDetail_UIBP:LuaInit()
+function Game_ItemDetail_UIBP:LuaInit()
     if self.bInitDoOnce then
         return
     end
@@ -129,7 +129,7 @@ end
 
 --异步加载配件列表ItemClass
 --功能：通过 GetBackpackUIComponentConfig 统一读取 AttachListItemWidget 控件路径并异步加载ItemClass
-function UGC_ItemDetail_UIBP:LoadAttachListItemClass()
+function Game_ItemDetail_UIBP:LoadAttachListItemClass()
     local RawValue = UGCBackpackSystemV2.GetBackpackUIComponentConfig(EBackpackUIComponentConfigKey.Widget_AttachListItemWidget)
     self.AttachListItemClassPath = UGCObjectUtility.GetPathBySoftObjectPath(RawValue)
 
@@ -142,7 +142,7 @@ end
 
 
 --异步加载Common_Item控件
-function UGC_ItemDetail_UIBP:LoadCommonItemWidget()
+function Game_ItemDetail_UIBP:LoadCommonItemWidget()
     local WeakSelf = WeakObjectPtr(self)
     UGCBackpackSystemV2.CreateCommonItemWidget(self.CanvasPanel_CommonItem, function(CommonItem)
         if not WeakSelf:IsValid() then return end
@@ -157,7 +157,7 @@ end
 
 
 ---对比按钮点击内部处理函数
-function UGC_ItemDetail_UIBP:OnContrastClicked()
+function Game_ItemDetail_UIBP:OnContrastClicked()
     if self.OnContrastClickCallback then
         self.OnContrastClickCallback()
     end
@@ -165,7 +165,7 @@ end
 
 
 ---关闭按钮点击内部处理函数
-function UGC_ItemDetail_UIBP:OnCloseClicked()
+function Game_ItemDetail_UIBP:OnCloseClicked()
     if self.OnCloseClickCallback then
         self.OnCloseClickCallback()
     end
@@ -176,7 +176,7 @@ end
 
 ---设置对比按钮选中状态（切换颜色：0=未对比/白色，1=对比中/黄色）
 ---@param bSelected boolean @是否处于对比中
-function UGC_ItemDetail_UIBP:SetContrastSelected(bSelected)
+function Game_ItemDetail_UIBP:SetContrastSelected(bSelected)
     if self.Switcher_Contrast then
         self.Switcher_Contrast:SetActiveWidgetIndex(bSelected and 1 or 0)
     end
@@ -194,7 +194,7 @@ end
 ---  CloseCallback:      function|nil       @关闭按钮点击回调
 ---  OnContrastClick:    function|nil       @对比按钮点击回调（点击Button_Contrast时触发）
 ---}
-function UGC_ItemDetail_UIBP:InitData(InParams)
+function Game_ItemDetail_UIBP:InitData(InParams)
     InParams = InParams or {}
     self.ItemDatas = InParams.ItemData
     self.InParams = InParams
@@ -227,7 +227,7 @@ end
 
 
 --刷新面板内容
-function UGC_ItemDetail_UIBP:Refresh()
+function Game_ItemDetail_UIBP:Refresh()
     if self.ItemDatas == nil or not self.ItemDatas.ItemDefineID then
         return
     end
@@ -238,7 +238,7 @@ end
 
 
 --清理面板内容
-function UGC_ItemDetail_UIBP:Clear()
+function Game_ItemDetail_UIBP:Clear()
     if self.VerticalBox_slot then
         self.VerticalBox_slot:ClearChildren()
     end
@@ -268,7 +268,7 @@ end
 --异步创建UI控件
 --@param WidgetPath string @控件蓝图路径
 --@param Callback function @创建完成回调
-function UGC_ItemDetail_UIBP:CreateUIWidgetAsync(WidgetPath, Callback)
+function Game_ItemDetail_UIBP:CreateUIWidgetAsync(WidgetPath, Callback)
     if not WidgetPath or WidgetPath == "" then
         return
     end
@@ -283,7 +283,7 @@ end
 
 --添加自定义控件到容器
 --@param CustomUI UUserWidget @要添加的控件
-function UGC_ItemDetail_UIBP:AddCustomWidget(CustomUI)
+function Game_ItemDetail_UIBP:AddCustomWidget(CustomUI)
     if self.VerticalBox_slot and CustomUI then
         self.VerticalBox_slot:AddChild(CustomUI)
     end
@@ -292,7 +292,7 @@ end
 
 --初始化自定义扩展控件
 --@param ItemData table @单个物品数据
-function UGC_ItemDetail_UIBP:InitCustomWidgets(ItemData)
+function Game_ItemDetail_UIBP:InitCustomWidgets(ItemData)
     self:Clear()
 
     if ItemData == nil then
@@ -368,7 +368,7 @@ end
 
 --设置物品详情信息
 --@param ItemData table @单个物品数据
-function UGC_ItemDetail_UIBP:SetItemInfo(ItemData)
+function Game_ItemDetail_UIBP:SetItemInfo(ItemData)
     local data = ItemData
     if data == nil then
         return
@@ -526,7 +526,7 @@ end
 ---@param ValidDefineID FItemDefineID @有效物品实例ID（可能为nil，非实例武器仅有ItemID）
 ---@param ItemID number @物品配置ID（非实例武器时用于展示）
 ---@param SlotName string|nil @装备槽位名（如 EquipmentSlot.Core.MainSlot1）
-function UGC_ItemDetail_UIBP:_InitWeaponDetailWidget(Widget, CanvasPanel, ValidDefineID, ItemID, SlotName)
+function Game_ItemDetail_UIBP:_InitWeaponDetailWidget(Widget, CanvasPanel, ValidDefineID, ItemID, SlotName)
     local CanvasSlot = CanvasPanel:AddChildToCanvas(Widget)
     if CanvasSlot then
         CanvasSlot:SetAnchors({Minimum = {X = 0, Y = 0}, Maximum = {X = 1, Y = 1}})
@@ -551,7 +551,7 @@ end
 ---@param CanvasPanel userdata @挂载容器CanvasPanel
 ---@param ConfigKey EBackpackUIComponentConfigKey @配置键（MainWeaponDetailPanel / SubWeaponDetailPanel）
 ---@param WidgetFieldName string @缓存字段名（"MainWeaponDetailWidget" / "SubWeaponDetailWidget"）
-function UGC_ItemDetail_UIBP:_SetupWeaponDetail(ItemData, ValidDefineID, ItemID, CanvasPanel, ConfigKey, WidgetFieldName)
+function Game_ItemDetail_UIBP:_SetupWeaponDetail(ItemData, ValidDefineID, ItemID, CanvasPanel, ConfigKey, WidgetFieldName)
     if not CanvasPanel then
         return
     end
@@ -594,7 +594,7 @@ end
 ---    .bHasWeapon boolean @该槽位是否有装备武器（无武器的Tab项置灰或隐藏）
 ---@param OnClickCallback function|nil @点击某个武器Tab时的回调，参数(SlotIdx)
 ---@param InitialSelectedIdx number|nil @初始选中的槽位索引（可选，不传则默认选中第一个有武器的Tab）
-function UGC_ItemDetail_UIBP:SetWeaponTabList(WeaponList, OnClickCallback, InitialSelectedIdx)
+function Game_ItemDetail_UIBP:SetWeaponTabList(WeaponList, OnClickCallback, InitialSelectedIdx)
     self.WeaponTabList = WeaponList
     if OnClickCallback then
         self.OnWeaponTabClickCallback = OnClickCallback
@@ -650,7 +650,7 @@ end
 
 ---设置当前选中的武器Tab索引，并刷新 UGC_ReuseList2_Tab 的选中态
 ---@param SlotIdx number @要选中的槽位索引（1=武器一, 2=武器二）
-function UGC_ItemDetail_UIBP:SetWeaponTabSelectedIdx(SlotIdx)
+function Game_ItemDetail_UIBP:SetWeaponTabSelectedIdx(SlotIdx)
     self.WeaponTabSelectedIdx = SlotIdx
     if self.UGC_ReuseList2_Tab and self.WeaponTabList then
         self.UGC_ReuseList2_Tab:Reload(#self.WeaponTabList)
@@ -659,7 +659,7 @@ end
 
 
 ---异步加载武器Tab的ItemClass
-function UGC_ItemDetail_UIBP:LoadTabButtonItemClass()
+function Game_ItemDetail_UIBP:LoadTabButtonItemClass()
     -- 尝试从 BackpackUIComponent 获取路径
     local ClassPath = nil
     local ItemDetailsTabItemWidget = UGCBackpackSystemV2.GetBackpackUIComponentConfig(EBackpackUIComponentConfigKey.Widget_ItemDetailsTabItemWidget)
@@ -694,7 +694,7 @@ end
 ---TabItem 为 Lua 控件 (UGC_ItemDetails_TabItem_UIBP)，通过 Lua 接口操作
 ---@param Widget userdata @列表项Widget（UGC_ItemDetails_TabItem_UIBP 实例）
 ---@param Idx number @列表索引（从0开始）
-function UGC_ItemDetail_UIBP:OnUpdateItem_Tab(Widget, Idx)
+function Game_ItemDetail_UIBP:OnUpdateItem_Tab(Widget, Idx)
     
     local TabData = self.WeaponTabList and self.WeaponTabList[Idx + 1]
     if not TabData then
@@ -761,7 +761,7 @@ end
 --配件列表项更新回调（ReuseList2 OnUpdateItem）
 --@param Widget userdata @列表项Widget（UGC_ItemParts_Open_UIBP实例）
 --@param Idx number @列表索引（从0开始）
-function UGC_ItemDetail_UIBP:OnUpdateItem(Widget, Idx)
+function Game_ItemDetail_UIBP:OnUpdateItem(Widget, Idx)
     local AttachItem = self.AttachItems[Idx + 1]
     if not AttachItem then
         return
@@ -777,7 +777,7 @@ end
 ---动态设置配件列表ItemClass并刷新列表
 ---功能：异步加载ItemClass，设置到ReuseList2后刷新列表
 ---@param classPath string @ItemClass路径
-function UGC_ItemDetail_UIBP:SetAttachItemClassAndReload(classPath)
+function Game_ItemDetail_UIBP:SetAttachItemClassAndReload(classPath)
     if not classPath or classPath == "" then
         return
     end
@@ -823,7 +823,7 @@ end
 ---ReuseList2_Accessory 列表项更新回调
 ---@param Widget userdata @列表项Widget（UGC_WeaponFitting_Open_UIBP 实例）
 ---@param Idx number @列表索引（从0开始）
-function UGC_ItemDetail_UIBP:OnUpdateItem_Accessory(Widget, Idx)
+function Game_ItemDetail_UIBP:OnUpdateItem_Accessory(Widget, Idx)
     local SlotData = self.AccessorySlots[Idx + 1]
     if not SlotData then
         return
@@ -838,7 +838,7 @@ end
 
 
 ---异步加载 ReuseList2_Accessory 的 ItemClass（WeaponFittingSlot）
-function UGC_ItemDetail_UIBP:LoadAccessoryItemClass()
+function Game_ItemDetail_UIBP:LoadAccessoryItemClass()
     if self.bAccessoryItemClassLoaded then
         return
     end
@@ -865,7 +865,7 @@ end
 
 
 --析构函数，UI销毁时自动调用
-function UGC_ItemDetail_UIBP:Destruct()
+function Game_ItemDetail_UIBP:Destruct()
     -- 移除配件列表事件绑定
     if self.UGC_ReuseList2_Item then
         self.UGC_ReuseList2_Item.OnUpdateItem:Remove(self.OnUpdateItem, self)
@@ -913,4 +913,4 @@ function UGC_ItemDetail_UIBP:Destruct()
 end
 
 
-return UGC_ItemDetail_UIBP
+return Game_ItemDetail_UIBP
