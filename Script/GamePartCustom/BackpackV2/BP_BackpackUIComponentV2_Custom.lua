@@ -122,20 +122,66 @@ function BP_BackpackUIComponentV2_Custom:BindEquipChangeDelegates()
             end
             print(string.format("[EquipRefresh] AttachParent argc=%d SlotName=%s", Count, tostring(SlotName)))
             Owner:OnEquipSlotChanged(SlotName)
-
-            -- 服务端：装备槽位变化后重算槽位强化属性加成
-            if UGCGameSystem.IsServer() then
-                local Pawn = PC and PC:GetPlayerCharacterSafety() or nil
-                if Pawn then
-                    EquipSlotAttrApplier.OnEquipChanged(Pawn, SlotName)
-                end
-            end
+            -- 注意：这里不要写 `if UGCGameSystem.IsServer() then EquipSlotAttrApplier.OnEquipChanged(...) end`——
+            -- 该回调只可能在客户端执行（内核委托在 DS 不广播），服务端重算请走下面
+            -- BindEquipAttrNotify（客户端上报）+ UGCPlayerController:ServerRPC_NotifyEquipSlotChanged。
         end, self)
         self.__TTYEquipChangeBound = true
         print("[EquipRefresh] bound ItemAttachParentChangeDelegateV2")
     else
         print("[EquipRefresh] GetItemAttachParentChangeDelegateV2 failed")
     end
+end
+
+---客户端：装备槽变化时"推"给服务端，让服务端立刻重算槽位强化加成（第二道保险）
+---背景（实测结论）：
+---  - 内核 GetItemAttachParentChangeDelegateV2 在**服务端不广播** ⇒ 服务端无法用它做事件驱动，
+---    只能依赖 EquipSlotAttrApplier 的 0.25s 装备快照轮询（主保险）；
+---  - 同一委托在**客户端会正常广播**（穿戴/卸下各一次）⇒ 由客户端上报、服务端重算，
+---    作为轮询之外的第二道保险（轮询定时器失守时属性仍能被纠正）。
+---  - 该委托的参数是 ItemDefineID 结构体、不含槽位名，解析不到时让服务端做全量重算。
+---@param Retry number|nil 内部重试计数
+function BP_BackpackUIComponentV2_Custom:BindEquipAttrNotify(Retry)
+    if self.__TTYEquipAttrNotifyBound or UGCGameSystem.IsServer() then
+        return
+    end
+    local PC = UGCGameSystem.GetLocalPlayerController()
+    local Comp = PC and UGCBackpackSystemV2.GetBackpackComponentV2(PC) or nil
+    if not (PC and Comp) then
+        Retry = (Retry or 0) + 1
+        if Retry <= 20 then
+            UGCGameSystem.SetTimer(self, function()
+                self:BindEquipAttrNotify(Retry)
+            end, 0.25, false)
+        else
+            print("[EquipNotify] 放弃绑定：拿不到 PC/BackpackComponent（重试 " .. tostring(Retry) .. " 次）")
+        end
+        return
+    end
+    local Ok, Delegate = pcall(function()
+        return Comp:GetItemAttachParentChangeDelegateV2()
+    end)
+    if not (Ok and Delegate and Delegate.Add) then
+        print("[EquipNotify] GetItemAttachParentChangeDelegateV2 failed")
+        return
+    end
+    Delegate:Add(function(...)
+        local SlotName = nil
+        local Count = select("#", ...)
+        for i = 1, Count do
+            local Arg = select(i, ...)
+            if type(Arg) == "string" and string.find(Arg, "EquipmentSlot", 1, true) then
+                SlotName = Arg
+                break
+            end
+            SlotName = SlotName or SlotNameToString(Arg)
+        end
+        print(string.format("[EquipNotify] client equip changed argc=%d SlotName=%s -> notify server",
+            Count, tostring(SlotName)))
+        UnrealNetwork.CallUnrealRPC(PC, PC, 'ServerRPC_NotifyEquipSlotChanged', SlotName or "")
+    end, self)
+    self.__TTYEquipAttrNotifyBound = true
+    print("[EquipNotify] bound client-side equip notify")
 end
 
 function BP_BackpackUIComponentV2_Custom:ApplyItemDetail(Widget, ItemDefineID, ItemID)
@@ -356,6 +402,8 @@ function BP_BackpackUIComponentV2_Custom:ReceiveBeginPlay()
             EquipSlotAttrApplier.BindPlayer(Pawn)
         end
     end ]]
+    -- 客户端：装备变化时通知服务端重算槽位强化属性（第二道保险；独立绑定，不触发上面注释掉的旧 UI 刷新链）
+    self:BindEquipAttrNotify()
 end
 
 ---结束运行时执行

@@ -102,7 +102,7 @@ end
 function UGCPlayerController:GetAvailableServerRPCs()
     return "ServerTeleportTo", "ServerRPC_StartCircle", "Client_OnPawnRespawn", "ServerRPC_ChangeAttr",
         "Client_OnMonsterWaveStart", "Server_OnHeroSelectionFinished", "ServerRPC_AddItemWithInstanceData",
-        "ServerRPC_StrengthenEquipSlot", "ServerRPC_GMAddItem";
+        "ServerRPC_StrengthenEquipSlot", "ServerRPC_GMAddItem", "ServerRPC_NotifyEquipSlotChanged";
 end
 
 -- GM按钮
@@ -148,6 +148,25 @@ function UGCPlayerController:ServerRPC_StrengthenEquipSlot(SlotIdx, BatchCount)
     local OK, ErrCode, NewLevel = EquipSlotSystem.ServerTryStrengthen(CurPlayerState, PlayerPawn, SlotIdx, BatchCount or 1)
     print(string.format("ServerRPC_StrengthenEquipSlot Slot=%s Count=%s OK=%s Err=%s NewLevel=%s",
         tostring(SlotIdx), tostring(BatchCount), tostring(OK), tostring(ErrCode), tostring(NewLevel)))
+end
+
+-- 服务端：客户端上报"装备槽发生变化"，重算该槽（或全量）槽位强化加成。
+-- 这是**第二道保险**：
+--   主保险 = EquipSlotAttrApplier 在服务端启的 0.25s 装备快照轮询（内核装备委托在 DS 不广播）；
+--   此入口由客户端侧的装备变化委托驱动（该委托在客户端会广播，实测穿戴/卸下各一次），
+--   作用是：客户端发起换装后回退更快，且万一轮询定时器失守时属性仍能被纠正。
+-- @param SlotName string 内核槽位名（如 EquipmentSlot.Common.Head），空串/未识别时做全量重算
+function UGCPlayerController:ServerRPC_NotifyEquipSlotChanged(SlotName)
+    local EquipSlotAttrApplier = require('Script.Blueprint.Prefabs.UI.Equip.EquipSlotAttrApplier')
+    local PlayerPawn = self:GetPlayerCharacterSafety()
+    if not PlayerPawn then
+        return
+    end
+    if type(SlotName) ~= 'string' or SlotName == '' then
+        SlotName = nil
+    end
+    print(string.format('[EquipNotify] server recalc equip slot attr SlotName=%s', tostring(SlotName)))
+    EquipSlotAttrApplier.OnEquipChanged(PlayerPawn, SlotName)
 end
 
 ---GM：添加物品。ItemID=0 时加第一货币（金币）
