@@ -347,7 +347,7 @@ end
 ---开始运行时执行
 function BP_BackpackUIComponentV2_Custom:ReceiveBeginPlay()
     BP_BackpackUIComponentV2_Custom.SuperClass.ReceiveBeginPlay(self)
-    self:BindEquipChangeDelegates()
+   --[[  self:BindEquipChangeDelegates()
     -- 服务端：玩家进入后绑定槽位强化属性应用
     if UGCGameSystem.IsServer() then
         local PC = UGCGameSystem.GetLocalPlayerController()
@@ -355,12 +355,12 @@ function BP_BackpackUIComponentV2_Custom:ReceiveBeginPlay()
         if Pawn then
             EquipSlotAttrApplier.BindPlayer(Pawn)
         end
-    end
+    end ]]
 end
 
 ---结束运行时执行
 function BP_BackpackUIComponentV2_Custom:ReceiveEndPlay()
-    self.bBackpackOpen = false
+    --[[ self.bBackpackOpen = false
     if self.EquipRefreshTimer then
         UGCGameSystem.ClearTimer(self, self.EquipRefreshTimer)
         self.EquipRefreshTimer = nil
@@ -372,7 +372,7 @@ function BP_BackpackUIComponentV2_Custom:ReceiveEndPlay()
         if Pawn then
             EquipSlotAttrApplier.UnbindPlayer(Pawn)
         end
-    end
+    end ]]
     BP_BackpackUIComponentV2_Custom.SuperClass.ReceiveEndPlay(self)
 end
 
@@ -409,21 +409,21 @@ end
 
 ---背包UI打开后执行
 ---@param Panel UUserWidget @背包主界面控件
-function BP_BackpackUIComponentV2_Custom:OnOpenBattleMainPanel(Panel)
+--[[ function BP_BackpackUIComponentV2_Custom:OnOpenBattleMainPanel(Panel)
     self.bBackpackOpen = true
     self:HookCommonEquipSlotClicks()
-end
+end ]]
 
 ---背包UI关闭后执行
 ---@param Panel UUserWidget @背包主界面控件
-function BP_BackpackUIComponentV2_Custom:OnCloseBattleMainPanel(Panel)
+--[[ function BP_BackpackUIComponentV2_Custom:OnCloseBattleMainPanel(Panel)
     self.bBackpackOpen = false
     if self.EquipRefreshTimer then
         UGCGameSystem.ClearTimer(self, self.EquipRefreshTimer)
         self.EquipRefreshTimer = nil
     end
     self:HideCommonEquipDetail()
-end
+end ]]
 
 ---打开大厅背包界面(已废弃)
 ---生效范围：客户端
