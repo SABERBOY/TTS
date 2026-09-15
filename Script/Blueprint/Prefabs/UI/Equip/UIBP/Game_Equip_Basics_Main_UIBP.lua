@@ -22,8 +22,8 @@
 ---  点击空槽：不跳转，留在装备页只打一条提示日志。右侧页签进入强化页仍沿用上次槽位（首次=头盔）。
 ---  子控件都已是项目资产（Game_Equip_*），各自带 Lua 类：本面板只做编排，
 ---  槽位/背包的显示与点击由对应子控件自己的实例方法负责，不再有 New(Widget) 代理。
-local EquipSlotSystem = require('Script.Common.EquipSlotSystem')
-local EquipPanelManager = require('Script.Common.EquipPanelManager')
+local EquipSlotSystem = require('Script.Blueprint.Prefabs.UI.Equip.EquipSlotSystem')
+local EquipPanelManager = require('Script.Blueprint.Prefabs.UI.Equip.EquipPanelManager')
 local Game_Equip_Basics_Main_UIBP = {
     bInitDoOnce = false,
     bSlotWidgetsReady = false,

@@ -503,7 +503,7 @@ function EquipSlotSystem.ServerTryStrengthen(PlayerState, Player, SlotIdx, Count
     end
 
     -- 刷新槽位强化属性加成（服务端）
-    local EquipSlotAttrApplier = require('Script.Common.EquipSlotAttrApplier')
+    local EquipSlotAttrApplier = require('Script.Blueprint.Prefabs.UI.Equip.EquipSlotAttrApplier')
     EquipSlotAttrApplier.RefreshSlot(Player, SlotIdx)
 
     print(string.format('[EquipSlotSystem] 强化成功 Slot=%d(%s) %d->%d 金币-%d 零件-%d',

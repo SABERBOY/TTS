@@ -13,7 +13,7 @@
 ---  引擎按资产路径自动绑定本 Lua 类，self 就是控件本身；
 ---  列表刷新/格子复用/点击全部由本类的冒号实例方法处理。
 ---  Owner（装备主面板，用于取槽位等级与打开强化页）通过 InitData({Owner = ...}) 注入。
-local EquipSlotSystem = require('Script.Common.EquipSlotSystem')
+local EquipSlotSystem = require('Script.Blueprint.Prefabs.UI.Equip.EquipSlotSystem')
 
 local Game_Equip_Bag_UIBP = {
     bInitDoOnce = false,

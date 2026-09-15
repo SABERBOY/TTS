@@ -19,10 +19,11 @@ description: >-
 
 | 角色 | 文件 |
 | --- | --- |
-| 数据层：槽位/品阶/消耗/强化事务 | `Script/Common/EquipSlotSystem.lua` |
-| 运行时：装备+等级 → 属性加成 | `Script/Common/EquipSlotAttrApplier.lua` |
-| 强化面板 UI（无 Tick，属性委托刷新） | `Script/Blueprint/Prefabs/UI/UGC_Equip_Develop_Strengthen_UIBP.lua` |
-| 装备面板（读属性显示等级） | `Script/Blueprint/Prefabs/UI/UGC_Equip_Basics_Main_UIBP.lua` |
+| 数据层：槽位/品阶/消耗/强化事务 | `Script/Blueprint/Prefabs/UI/Equip/EquipSlotSystem.lua` |
+| 运行时：装备+等级 → 属性加成 | `Script/Blueprint/Prefabs/UI/Equip/EquipSlotAttrApplier.lua` |
+| 面板打开/关闭（GM 与槽位点击共用） | `Script/Blueprint/Prefabs/UI/Equip/EquipPanelManager.lua` |
+| 强化面板 UI（无 Tick，属性委托刷新） | `Script/Blueprint/Prefabs/UI/Equip/UIBP/Game_Equip_Develop_Strengthen_UIBP.lua` |
+| 装备面板（读属性显示等级） | `Script/Blueprint/Prefabs/UI/Equip/UIBP/Game_Equip_Basics_Main_UIBP.lua` |
 | 背包挂钩（换装刷新） | `Script/GamePartCustom/BackpackV2/BP_BackpackUIComponentV2_Custom.lua` |
 | RPC 注册 + 自动绑定 | `Script/Blueprint/UGCPlayerController.lua`（`ServerRPC_StrengthenEquipSlot` 在 `GetAvailableServerRPCs` 白名单） |
 | 属性常量（自动生成勿手改） | `Script/GameAttribute/game_attribute_type.lua` |

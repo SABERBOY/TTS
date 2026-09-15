@@ -1,7 +1,7 @@
 ---@class BP_BackpackUIComponentV2_Custom_C:BP_BackpackUIComponentV2_C
 --Edit Below--
 local BP_BackpackUIComponentV2_Custom = {}
-local EquipSlotAttrApplier = require('Script.Common.EquipSlotAttrApplier')
+local EquipSlotAttrApplier = require('Script.Blueprint.Prefabs.UI.Equip.EquipSlotAttrApplier')
 
 local COMMON_PREFIX = "EquipmentSlot.Common."
 local DETAIL_WIDGET_PATH = "Asset/Blueprint/Prefabs/UI/Equip/UIBP/Game_ItemDetail_UIBP.Game_ItemDetail_UIBP_C"

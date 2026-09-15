@@ -3,7 +3,7 @@
 ---  - 监听装备穿戴/卸下（GetItemAttachParentChangeDelegateV2）与 EquipSlotLv_* 属性变化。
 ---  - 实际生效等级 = min(槽位永久等级, 当前装备品阶强化上限)。
 ---  - 攻击槽 -> BaseAttack；生命槽 -> BaseHealth；差值用 AddGameAttributeValue 增减，避免覆盖其他系统。
-local EquipSlotSystem = require('Script.Common.EquipSlotSystem')
+local EquipSlotSystem = require('Script.Blueprint.Prefabs.UI.Equip.EquipSlotSystem')
 
 local EquipSlotAttrApplier = {}
 

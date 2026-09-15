@@ -95,7 +95,7 @@ end
 ---@param Delay number
 local function RefreshEquipPanelLater(PC, Delay)
     UGCGameSystem.SetTimer(PC, function()
-        local EquipPanelManager = require('Script.Common.EquipPanelManager')
+        local EquipPanelManager = require('Script.Blueprint.Prefabs.UI.Equip.EquipPanelManager')
         local Widget = EquipPanelManager.GetMainWidget()
         if Widget and CheckObjectContainsField(Widget, 'Refresh', true) then
             Widget:Refresh()
@@ -151,19 +151,19 @@ end
 
 function UGCGM:C_OpenEquipPanel()
     print('[GM] C_OpenEquipPanel')
-    local EquipPanelManager = require('Script.Common.EquipPanelManager')
+    local EquipPanelManager = require('Script.Blueprint.Prefabs.UI.Equip.EquipPanelManager')
     EquipPanelManager.Open({ PageId = 'basics' })
 end
 
 function UGCGM:C_CloseEquipPanel()
     print('[GM] C_CloseEquipPanel')
-    local EquipPanelManager = require('Script.Common.EquipPanelManager')
+    local EquipPanelManager = require('Script.Blueprint.Prefabs.UI.Equip.EquipPanelManager')
     EquipPanelManager.Close()
 end
 
 function UGCGM:C_OpenHelmetStrengthen()
     print('[GM] C_OpenHelmetStrengthen')
-    local EquipPanelManager = require('Script.Common.EquipPanelManager')
+    local EquipPanelManager = require('Script.Blueprint.Prefabs.UI.Equip.EquipPanelManager')
     EquipPanelManager.Open({ PageId = 'strengthen', SlotIdx = 1 })
 end
 

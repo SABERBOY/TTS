@@ -17,7 +17,7 @@
 ---装备主页面：右侧两级页签切换左侧已挂载的装备/强化/转化面板。
 ---  一级：装备 / 养成；养成下二级：强化 / 转化。
 ---  关闭按钮与页签 NewButton 的 OnClicked 不在 Construct 绑定（会原生崩溃），延迟到 InitData。
-local EquipSlotSystem = require('Script.Common.EquipSlotSystem')
+local EquipSlotSystem = require('Script.Blueprint.Prefabs.UI.Equip.EquipSlotSystem')
 
 local PAGE_BASICS = 'basics'
 local PAGE_STRENGTHEN = 'strengthen'

@@ -22,7 +22,7 @@
 ### 0. 拿对象 + 读基线
 
 ```lua
-local GS=UGCGameSystem.GetGameState() local PS=GS and GS.PlayerArray and GS.PlayerArray[1] local Pawn=PS and PS:GetPlayerCharacterSafety() if Pawn then print('V base BaseAttack='..tostring(UGCAttributeSystem.GetGameAttributeValue(Pawn,'BaseAttack'))..' SlotLv='..tostring(require('Script.Common.EquipSlotSystem').GetSlotLevel(nil,1,Pawn))) else print('V no pawn') end
+local GS=UGCGameSystem.GetGameState() local PS=GS and GS.PlayerArray and GS.PlayerArray[1] local Pawn=PS and PS:GetPlayerCharacterSafety() if Pawn then print('V base BaseAttack='..tostring(UGCAttributeSystem.GetGameAttributeValue(Pawn,'BaseAttack'))..' SlotLv='..tostring(require('Script.Blueprint.Prefabs.UI.Equip.EquipSlotSystem').GetSlotLevel(nil,1,Pawn))) else print('V no pawn') end
 ```
 
 ### 1. 穿 LV7_Helmet（自动装备；期望 125）
@@ -40,13 +40,13 @@ local GS=UGCGameSystem.GetGameState() local PS=GS and GS.PlayerArray and GS.Play
 ### 2. 强化头盔槽 1 级（先补金币；期望 126，金币-36 零件-1）
 
 ```lua
-local GS=UGCGameSystem.GetGameState() local PS=GS and GS.PlayerArray and GS.PlayerArray[1] local Pawn=PS and PS:GetPlayerCharacterSafety() local PC=Pawn and Pawn:GetController() local E=require('Script.Common.EquipSlotSystem') UGCBackpackSystemV2.AddItemV2(PC,E.GetGoldItemID(PC),100000) local ok,err,nl=E.ServerTryStrengthen(PS,Pawn,1,1) print('V strengthen ok='..tostring(ok)..' newlv='..tostring(nl)..' BaseAttack='..tostring(UGCAttributeSystem.GetGameAttributeValue(Pawn,'BaseAttack')))
+local GS=UGCGameSystem.GetGameState() local PS=GS and GS.PlayerArray and GS.PlayerArray[1] local Pawn=PS and PS:GetPlayerCharacterSafety() local PC=Pawn and Pawn:GetController() local E=require('Script.Blueprint.Prefabs.UI.Equip.EquipSlotSystem') UGCBackpackSystemV2.AddItemV2(PC,E.GetGoldItemID(PC),100000) local ok,err,nl=E.ServerTryStrengthen(PS,Pawn,1,1) print('V strengthen ok='..tostring(ok)..' newlv='..tostring(nl)..' BaseAttack='..tostring(UGCAttributeSystem.GetGameAttributeValue(Pawn,'BaseAttack')))
 ```
 
 ### 3. Cap 限制（强化 20 级到 22；期望 134 = 100+24+10）
 
 ```lua
-local GS=UGCGameSystem.GetGameState() local PS=GS and GS.PlayerArray and GS.PlayerArray[1] local Pawn=PS and PS:GetPlayerCharacterSafety() local E=require('Script.Common.EquipSlotSystem') local ok,err,nl=E.ServerTryStrengthen(PS,Pawn,1,20) print('V cap ok='..tostring(ok)..' newlv='..tostring(nl)..' BaseAttack='..tostring(UGCAttributeSystem.GetGameAttributeValue(Pawn,'BaseAttack')))
+local GS=UGCGameSystem.GetGameState() local PS=GS and GS.PlayerArray and GS.PlayerArray[1] local Pawn=PS and PS:GetPlayerCharacterSafety() local E=require('Script.Blueprint.Prefabs.UI.Equip.EquipSlotSystem') local ok,err,nl=E.ServerTryStrengthen(PS,Pawn,1,20) print('V cap ok='..tostring(ok)..' newlv='..tostring(nl)..' BaseAttack='..tostring(UGCAttributeSystem.GetGameAttributeValue(Pawn,'BaseAttack')))
 ```
 
 ### 4. 卸下（期望回 100，SlotLv 保留 22；轮询 ≤0.25s 后生效）
@@ -60,7 +60,7 @@ local GS=UGCGameSystem.GetGameState() local PS=GS and GS.PlayerArray and GS.Play
 ### 5. 客户端 RPC 通路（target=client）
 
 ```lua
-local E=require('Script.Common.EquipSlotSystem') E.ClientRequestStrengthen(1,1) print('V client-sent')
+local E=require('Script.Blueprint.Prefabs.UI.Equip.EquipSlotSystem') E.ClientRequestStrengthen(1,1) print('V client-sent')
 ```
 
 DS 日志应出现 `ReceiveUnrealRPC UGCPlayerController_C_0:ServerRPC_StrengthenEquipSlot` 和 `强化成功`。

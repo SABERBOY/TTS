@@ -24,7 +24,7 @@
 ---  挂在 Game_Equip_Main_UIBP 左侧，由养成/强化页签或槽位点击 InitData{SlotIdx, CloseCallback} 切入。
 ---  Grade 卡片与背包格子都是项目资产（Game_Equip_*）自带 Lua 类：本面板只准备数据，
 ---  渲染/图标/点击由对应子控件的实例方法处理，不再有 New(Widget) 代理。
-local EquipSlotSystem = require('Script.Common.EquipSlotSystem')
+local EquipSlotSystem = require('Script.Blueprint.Prefabs.UI.Equip.EquipSlotSystem')
 local Game_Equip_Develop_Strengthen_UIBP = {
     bInitDoOnce = false,
     bButtonsBound = false, -- 按钮委托是否已绑定（必须延迟到 InitData 时机，Construct 期绑定会原生崩溃）
