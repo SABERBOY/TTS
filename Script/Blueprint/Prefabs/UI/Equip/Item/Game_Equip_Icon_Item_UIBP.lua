@@ -107,6 +107,35 @@ function Game_Equip_Icon_Item_UIBP:LuaInit()
     if self.CanvasPanel_Unusable then
         self.CanvasPanel_Unusable:SetVisibility(ESlateVisibility.Collapsed)
     end
+    -- 点击/拖拽热区必须打开：预制体（含引擎原版 UGC_Equip_Icon_Item_UIBP）里
+    -- Common_DragDrop_Item 默认是 Collapsed，而 Collapsed 不参与命中测试
+    -- → 真实鼠标点击永远到不了它，OnDragClicked 不会广播（BindClick 只是 Add 委托，会"假成功"）。
+    -- 它的 slot 是 0,0→1,1 拉伸锚点，打开后正好是整格热区，且 prefab 内无可见图元（是个空 CanvasPanel）。
+    self:EnsureClickHotArea()
+end
+
+---确保点击热区可命中（幂等）。Collapsed/Hidden/HitTestInvisible 都收不到点击，
+---只有 Visible 才让控件自身参与命中测试。
+---@return boolean
+function Game_Equip_Icon_Item_UIBP:EnsureClickHotArea()
+    local DragDrop = self.Common_DragDrop_Item
+    if not DragDrop then
+        return false
+    end
+    local Prev = 'unknown'
+    pcall(function()
+        Prev = tostring(DragDrop:GetVisibility())
+    end)
+    -- ESlateVisibility.Visible 的数值是 0
+    if Prev == '0' then
+        return true
+    end
+    local OK = pcall(function()
+        DragDrop:SetVisibility(ESlateVisibility.Visible)
+    end)
+    print(string.format('[EquipIcon] 点击热区 Visibility=%s（非 Visible 收不到点击），已强制打开 ok=%s',
+        Prev, tostring(OK)))
+    return OK == true
 end
 
 ---等级数字。预制体里 TextBlock 已固定显示 "LV." 前缀，这里只写数字。
@@ -269,6 +298,8 @@ function Game_Equip_Icon_Item_UIBP:BindClick(OnClick)
     if not DragDrop then
         return false
     end
+    -- 绑定前先纠正热区可命中状态：否则 Add 成功但回调永不触发（静默失效）
+    self:EnsureClickHotArea()
     local OK = pcall(function()
         DragDrop.OnDragClicked:Add(OnClick)
     end)

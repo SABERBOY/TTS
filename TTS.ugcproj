@@ -9,7 +9,7 @@ ProjectShortPath=/TTS/
 StartMapName=/TTS/UGCmap
 MapMode=0
 bIsBigWorld=0
-Version=1.38.12.15914
+Version=1.38.12.15916
 UpdateVersion=10
 GameModePath=/TTS/Asset/Blueprint/UGCGameMode.UGCGameMode_C
 
@@ -17,6 +17,7 @@ GameModePath=/TTS/Asset/Blueprint/UGCGameMode.UGCGameMode_C
 bOpenItemEditorV1=0
 bOpenSkillEditorV1=0
 bOpenParticleEditorV1=0
+bExpandItemQuotaTo4000=0
 
 [MatchSetting]
 NumberOfTeams=1

@@ -18,7 +18,8 @@
 ---  挂在 Game_Equip_Main_UIBP 左侧；不再作为独立页面打开。
 ---  左侧 = 玩家当前已装备的六槽位（头盔/衣服/首饰/手套/腰带/鞋子），显示各槽位永久强化等级；
 ---  右侧 = 背包装备列表（子面板 Game_Equip_Bag_UIBP 承载）。
----  点击装备槽切到主页面强化页签，强化的是槽位而非装备本体。
+---  点击"已有装备"的槽位：切到主页面强化页签并强化该插槽（强化对象是槽位而非装备本体）；
+---  点击空槽：不跳转，留在装备页只打一条提示日志。右侧页签进入强化页仍沿用上次槽位（首次=头盔）。
 ---  子控件都已是项目资产（Game_Equip_*），各自带 Lua 类：本面板只做编排，
 ---  槽位/背包的显示与点击由对应子控件自己的实例方法负责，不再有 New(Widget) 代理。
 local EquipSlotSystem = require('Script.Common.EquipSlotSystem')
@@ -110,8 +111,15 @@ function Game_Equip_Basics_Main_UIBP:OnSlotClicked(SlotIdx)
     local DefineID, ItemID = EquipSlotSystem.GetEquippedOnSlot(SlotIdx)
     print(string.format('[EquipBasics] OnSlotClicked SlotIdx=%s ItemID=%s', tostring(SlotIdx), tostring(ItemID)))
     if not ItemID then
-        print('[EquipBasics] 该槽位当前没有装备，仍打开强化面板（强化对象是槽位）')
+        -- 空槽不跳转：留在装备页，只提示。
+        -- 手套(4)/腰带(5)没有内核槽位（EquipSlotSystem.KernelSlotNames 为 nil），
+        -- GetEquippedOnSlot 永远返回 nil，因此这两槽按规则永不跳转强化页。
+        local SlotDef = EquipSlotSystem.GetSlotDef(SlotIdx)
+        print(string.format('[EquipBasics] %s槽 未装备，取消跳转强化面板',
+            tostring(SlotDef and SlotDef.Name or SlotIdx)))
+        return
     end
+    -- 有装备：带着点击的 SlotIdx 跳到强化页，强化对象就是该插槽
     self:OpenStrengthenPanel(SlotIdx)
 end
 function Game_Equip_Basics_Main_UIBP:OpenStrengthenPanel(SlotIdx)
