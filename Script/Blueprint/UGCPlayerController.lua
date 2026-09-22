@@ -26,7 +26,26 @@ function UGCPlayerController:ReceiveBeginPlay()
         self.Main_GameWidget:AddToViewport()
     end
 
-    self:GetCurPlayerState():InitPlayerState(self)
+    -- 客户端 ReceiveBeginPlay 时 PlayerState 可能还没就绪（GetCurPlayerState 返回 nil），
+    -- 直接 :InitPlayerState 会 index nil；沿用下面 TryBind 的重试轮询等它就绪
+    local InitRetries = 0
+    local function TryInitPlayerState()
+        local PlayerState = self:GetCurPlayerState()
+        print("[UGCPlayerController] GetCurPlayerState PlayerState:".. tostring(PlayerState==nil))
+        if PlayerState then
+            PlayerState:InitPlayerState(self)
+            return
+        end
+        InitRetries = InitRetries + 1
+        if InitRetries > 40 then
+            print("[UGCPlayerController] GetCurPlayerState 始终为 nil，放弃 InitPlayerState")
+            return
+        end
+        if UGCGameSystem.SetTimer then
+            UGCGameSystem.SetTimer(self, TryInitPlayerState, 0.25, false)
+        end
+    end
+    TryInitPlayerState()
 
     -- 服务端：绑定装备槽位强化属性应用器（ReceiveBeginPlay 时 Pawn 可能尚未生成，带重试）
     if self:HasAuthority() then
@@ -102,7 +121,8 @@ end
 function UGCPlayerController:GetAvailableServerRPCs()
     return "ServerTeleportTo", "ServerRPC_StartCircle", "Client_OnPawnRespawn", "ServerRPC_ChangeAttr",
         "Client_OnMonsterWaveStart", "Server_OnHeroSelectionFinished", "ServerRPC_AddItemWithInstanceData",
-        "ServerRPC_StrengthenEquipSlot", "ServerRPC_GMAddItem", "ServerRPC_NotifyEquipSlotChanged";
+        "ServerRPC_StrengthenEquipSlot", "ServerRPC_GMAddItem", "ServerRPC_NotifyEquipSlotChanged",
+        "ServerRPC_GMSummonMonster";
 end
 
 -- GM按钮
@@ -189,6 +209,57 @@ function UGCPlayerController:ServerRPC_GMAddItem(ItemID, Count)
     end)
     print(string.format('[GM] ServerRPC_GMAddItem ItemID=%s Count=%s ok=%s err=%s',
         tostring(ItemID), tostring(Count), tostring(OK), tostring(Err)))
+end
+
+
+---GM：一键召唤超级怪物到玩家身边。
+---优先把场景里已有的 SuperMonster 传送到玩家脚下；没有则直接在玩家位置生成一只；
+---最后把玩家写入怪物的黑板 Target，让它立即进入战斗追击。
+function UGCPlayerController:ServerRPC_GMSummonMonster()
+    local PlayerPawn = self:GetPlayerCharacterSafety()
+    if not PlayerPawn then
+        print('[GM] ServerRPC_GMSummonMonster: no PlayerPawn')
+        return
+    end
+
+    local MonsterClass = UE.LoadClass('/TTS/Asset/Blueprint/Prefabs/Monsters/SuperMonster.SuperMonster_C')
+    if not MonsterClass then
+        print('[GM] ServerRPC_GMSummonMonster: load SuperMonster class failed')
+        return
+    end
+
+    local SpawnLoc = PlayerPawn:K2_GetActorLocation()
+    local Ctx = UGCGameSystem.GetGameMode() or PlayerPawn
+
+    local Monster = nil
+    local MonsterList = UGCActorComponentUtility.GetAllActorsOfClass(Ctx, MonsterClass)
+    if MonsterList then
+        for _, M in pairs(MonsterList) do
+            if UE.IsValid(M) then
+                Monster = M
+                break
+            end
+        end
+    end
+
+    if Monster then
+        Monster:K2_SetActorLocation(SpawnLoc)
+        print('[GM] ServerRPC_GMSummonMonster: teleported existing SuperMonster to player')
+    else
+        local Rotation = PlayerPawn:K2_GetActorRotation()
+        Monster = UGCGenericCharacterSystem.SpawnGenericCharacter(PlayerPawn, MonsterClass, SpawnLoc, Rotation)
+        print(string.format('[GM] ServerRPC_GMSummonMonster: spawned new SuperMonster ok=%s',
+            tostring(UE.IsValid(Monster))))
+    end
+    if not UE.IsValid(Monster) then
+        return
+    end
+
+    local BB = Monster:GetBlackBoardComponent()
+    if BB then
+        BB:SetValueAsObject('Target', PlayerPawn)
+        print('[GM] ServerRPC_GMSummonMonster: Target set to player')
+    end
 end
 
 

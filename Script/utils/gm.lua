@@ -35,7 +35,26 @@ function UGCGM:Register(DebugUI)
         },
     }
 
+    CurFuncList["怪物测试"] = {
+        ["行为树"] = {
+            {UGCGMUI.ItemTypeEnum.Button, {{"召唤超级怪物到身边"}, {"SuperMonster 传送到玩家脚下（场景里没有则直接生成），并把玩家设为目标"}}, "C_SummonSuperMonster"},
+        },
+    }
+
     return CurFuncList
+end
+
+--- GM命令：一键召唤超级怪物到玩家身边
+--- 在客户端被调用，通过 ServerRPC 转发到 DS 端执行
+function UGCGM:C_SummonSuperMonster()
+    print('[GM] C_SummonSuperMonster')
+    local PC = UGCGameSystem.GetLocalPlayerController()
+    if not PC then
+        print('[GM] C_SummonSuperMonster: PlayerController is nil')
+        return
+    end
+    UnrealNetwork.CallUnrealRPC(PC, PC, 'ServerRPC_GMSummonMonster')
+    print('[GM] C_SummonSuperMonster: sent ServerRPC')
 end
 
 --- GM命令：添加带实例数据的物品

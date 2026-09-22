@@ -10,7 +10,19 @@ local BP_TransferNode = {}
  
 function BP_TransferNode:ReceiveBeginPlay()
     BP_TransferNode.SuperClass.ReceiveBeginPlay(self)
-    self.Widget.Widget.TextBlock_Title:SetText(self.CategoryName)
+
+    -- 刷传送点标题是纯客户端表现：DS 上 WidgetComponent 不会实例化 UUserWidget，
+    -- 之前无条件执行导致服务端每个传送点都报一次 index a nil value（客户端一直正常）
+    if UGCGameSystem.IsServer() then
+        return
+    end
+
+    local TitleWidget = self.Widget and self.Widget.Widget
+    if not TitleWidget or not TitleWidget.TextBlock_Title then
+        print("BP_TransferNode:ReceiveBeginPlay Widget/TextBlock_Title 未配置，跳过标题设置")
+        return
+    end
+    TitleWidget.TextBlock_Title:SetText(self.CategoryName)
 end
 
 

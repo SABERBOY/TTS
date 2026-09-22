@@ -319,6 +319,23 @@ function Game_Equip_Develop_Strengthen_UIBP:RefreshBasicGroup(SlotIdx, SlotDef, 
             NewValue = 'Lv.' .. tostring(NextEffective),
         }
     end
+    -- 不限量额外词条预览：同生效等级，每条一行（失败静默，保证面板不崩）
+    pcall(function()
+        if Preview.DefineID then
+            local EquipAffixSystem = require('Script.Blueprint.Prefabs.UI.Equip.EquipAffixSystem')
+            local Rows = EquipAffixSystem.ResolveAffixes(Preview.DefineID)
+            local NextEffective = Preview.Rank and math.min(Preview.Target, Preview.Cap) or Preview.Target
+            for _, Row in ipairs(Rows) do
+                local Cur = EquipAffixSystem.GetAffixBonus(Row, Preview.EffectiveLevel)
+                local Nxt = EquipAffixSystem.GetAffixBonus(Row, NextEffective)
+                self.BasicItems[#self.BasicItems + 1] = {
+                    Name = '词条·' .. tostring(Row.TargetAttr),
+                    OldValue = '+' .. tostring(Cur),
+                    NewValue = '+' .. tostring(Nxt),
+                }
+            end
+        end
+    end)
     local Box = TryGetWidget(Group, 'WrapGroupBox_property')
     if not Box then
         return

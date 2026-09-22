@@ -3,7 +3,9 @@
 ---  - 监听装备穿戴/卸下（GetItemAttachParentChangeDelegateV2）与 EquipSlotLv_* 属性变化。
 ---  - 实际生效等级 = min(槽位永久等级, 当前装备品阶强化上限)。
 ---  - 攻击槽 -> BaseAttack；生命槽 -> BaseHealth；差值用 AddGameAttributeValue 增减，避免覆盖其他系统。
+---  - 不限量额外词条（EquipAffixSystem）：实例 CustomData.ExtraAffixes 引用的模板，按同 EffectiveLevel 逐条差值应用。
 local EquipSlotSystem = require('Script.Blueprint.Prefabs.UI.Equip.EquipSlotSystem')
+local EquipAffixSystem = require('Script.Blueprint.Prefabs.UI.Equip.EquipAffixSystem')
 
 local EquipSlotAttrApplier = {}
 
@@ -22,6 +24,10 @@ local SLOT_NAME_MAP = {
 
 -- 已应用加成缓存：PlayerPawn -> SlotIdx -> {Bonus, AttrName}
 local AppliedBonusCache = {}
+-- 已应用词条缓存：PlayerPawn -> SlotIdx -> AffixID -> {Bonus, AttrName}
+local AppliedAffixCache = {}
+-- 词条指纹缓存：PlayerPawn -> SlotIdx -> fingerprint（已穿戴下追加词条时 DefineID 不变，靠指纹触发）
+local AffixFingerprintCache = {}
 -- 已绑定委托的 Pawn 记录
 local BoundPawns = {}
 -- 装备快照缓存：PlayerPawn -> SlotIdx -> TypeSpecificID（用于检测装备变化，服务端委托不可靠时的兜底）
@@ -80,12 +86,14 @@ function EquipSlotAttrApplier.RefreshSlot(PlayerPawn, SlotIdx)
 
     local SlotLevel = EquipSlotSystem.GetSlotLevel(nil, SlotIdx, PlayerPawn)
     local RankOrder = nil
+    local EquippedDefineID = nil
     local PC = PlayerPawn:GetController()
     if PC then
         local SlotName = SLOT_NAME_MAP[SlotIdx]
         if SlotName then
             local DefineID = EquipSlotAttrApplier.GetEquippedDefineID(PC, SlotName)
             if EquipSlotAttrApplier.IsDefineIDValid(DefineID) then
+                EquippedDefineID = DefineID
                 RankOrder = EquipSlotSystem.GetEquipRankOrder(DefineID)
             end
         end
@@ -106,6 +114,45 @@ function EquipSlotAttrApplier.RefreshSlot(PlayerPawn, SlotIdx)
             SlotIdx, SlotDef.Name, SlotLevel, tostring(RankOrder), EffectiveLevel, Bonus, Delta, AttrName))
     end
     AppliedBonusCache[PlayerPawn][SlotIdx] = { Bonus = Bonus, AttrName = AttrName }
+
+    -- 不限量额外词条：同 EffectiveLevel，按条差值应用；卸下时 Eff=0 自动扣回
+    AppliedAffixCache[PlayerPawn] = AppliedAffixCache[PlayerPawn] or {}
+    AffixFingerprintCache[PlayerPawn] = AffixFingerprintCache[PlayerPawn] or {}
+    local OldAffixes = AppliedAffixCache[PlayerPawn][SlotIdx] or {}
+    local NewAffixes = {}
+    if EquippedDefineID then
+        local OK, Rows = pcall(EquipAffixSystem.ResolveAffixes, EquippedDefineID)
+        if OK and type(Rows) == 'table' then
+            for _, Row in ipairs(Rows) do
+                local NewBonus = EquipAffixSystem.GetAffixBonus(Row, EffectiveLevel)
+                NewAffixes[Row.AffixID] = { Bonus = NewBonus, AttrName = Row.TargetAttr }
+            end
+        end
+        local OKF, Fingerprint = pcall(EquipAffixSystem.GetFingerprint, EquippedDefineID)
+        AffixFingerprintCache[PlayerPawn][SlotIdx] = (OKF and Fingerprint) or ''
+    else
+        AffixFingerprintCache[PlayerPawn][SlotIdx] = ''
+    end
+    for AffixID, OldEntry in pairs(OldAffixes) do
+        if NewAffixes[AffixID] == nil then
+            if OldEntry.Bonus ~= 0 then
+                UGCAttributeSystem.AddGameAttributeValue(PlayerPawn, OldEntry.AttrName, -OldEntry.Bonus)
+                print(string.format('[EquipAffix] 移除 Slot=%d Affix=%s Attr=%s -%s',
+                    SlotIdx, tostring(AffixID), tostring(OldEntry.AttrName), tostring(OldEntry.Bonus)))
+            end
+        end
+    end
+    for AffixID, NewEntry in pairs(NewAffixes) do
+        local OldBonus = OldAffixes[AffixID] and OldAffixes[AffixID].Bonus or 0
+        local AffixDelta = NewEntry.Bonus - OldBonus
+        if AffixDelta ~= 0 then
+            UGCAttributeSystem.AddGameAttributeValue(PlayerPawn, NewEntry.AttrName, AffixDelta)
+            print(string.format('[EquipAffix] Slot=%d Affix=%s Attr=%s Eff=%d Bonus=%s Delta=%s',
+                SlotIdx, tostring(AffixID), tostring(NewEntry.AttrName),
+                EffectiveLevel, tostring(NewEntry.Bonus), tostring(AffixDelta)))
+        end
+    end
+    AppliedAffixCache[PlayerPawn][SlotIdx] = NewAffixes
 end
 
 ---刷新玩家所有槽位
@@ -148,6 +195,17 @@ function EquipSlotAttrApplier.BindPlayer(PlayerPawn)
     end
     if BoundPawns[PlayerPawn] then
         return
+    end
+
+    -- 登录灌回存档里的强化等级：必须在绑定属性委托与首次 RefreshAllSlots 之前，
+    -- 否则首帧会按默认等级算加成。存档要等 PostLogin 才就绪，模块内按 0.25s 间隔带重试地读。
+    -- 注：这里只灌强化等级。装备/背包物品/货币的跨对局保留由引擎原生负责
+    -- （物品编辑器的「是否持久化」= ShouldPersist），本项目不再自己存一套。
+    local OKPersist, EquipSlotPersist = pcall(require, 'Script.Blueprint.Prefabs.UI.Equip.EquipSlotPersist')
+    if OKPersist and EquipSlotPersist then
+        EquipSlotPersist.BindLoadHooks(PlayerPawn, function(Pawn)
+            EquipSlotAttrApplier.RefreshAllSlots(Pawn)
+        end)
     end
 
     local PC = PlayerPawn:GetController()
@@ -203,8 +261,21 @@ function EquipSlotAttrApplier.BindPlayer(PlayerPawn)
                     ID = DefineID
                 end
                 ID = ID or 0
+                local Changed = false
                 if EquipSnapshotCache[PlayerPawn][SlotIdx] ~= ID then
                     EquipSnapshotCache[PlayerPawn][SlotIdx] = ID
+                    Changed = true
+                end
+                -- 已穿戴下 CustomData.ExtraAffixes 变化时 DefineID 不变，靠指纹触发
+                if not Changed and ID ~= 0 and DefineID then
+                    local OKF, Fingerprint = pcall(EquipAffixSystem.GetFingerprint, DefineID)
+                    local OldFingerprint = AffixFingerprintCache[PlayerPawn]
+                        and AffixFingerprintCache[PlayerPawn][SlotIdx] or nil
+                    if OKF and OldFingerprint ~= nil and Fingerprint ~= OldFingerprint then
+                        Changed = true
+                    end
+                end
+                if Changed then
                     EquipSlotAttrApplier.RefreshSlot(PlayerPawn, SlotIdx)
                 end
             end
@@ -230,7 +301,13 @@ function EquipSlotAttrApplier.UnbindPlayer(PlayerPawn)
     end
     BoundPawns[PlayerPawn] = nil
     AppliedBonusCache[PlayerPawn] = nil
+    AppliedAffixCache[PlayerPawn] = nil
+    AffixFingerprintCache[PlayerPawn] = nil
     EquipSnapshotCache[PlayerPawn] = nil
+    local OKPersist, EquipSlotPersist = pcall(require, 'Script.Blueprint.Prefabs.UI.Equip.EquipSlotPersist')
+    if OKPersist and EquipSlotPersist then
+        EquipSlotPersist.UnbindPawn(PlayerPawn)
+    end
     if EquipPollTimers[PlayerPawn] and UGCGameSystem.ClearTimer then
         pcall(function()
             UGCGameSystem.ClearTimer(PlayerPawn, EquipPollTimers[PlayerPawn])

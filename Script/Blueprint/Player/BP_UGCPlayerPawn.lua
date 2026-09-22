@@ -5,7 +5,6 @@
 local Delegate = require("common.Delegate")
 
 local BP_UGCPlayerPawn = {
-    OnWeaponChange = nil,
     OnBulletHitDelegate = nil,
     OnSporeTransmission = nil,
     OnPoisoningDelegate = nil,
@@ -13,9 +12,11 @@ local BP_UGCPlayerPawn = {
 }
 
 function BP_UGCPlayerPawn:UGC_ChangeCurrentUsingWeaponEvent(UsingWeaponSlot, LastSlot)
-    self.OnWeaponChange()
-    print("BP_UGCPlayerPawn:ReceiveBeginPlay Log: -- Call切换武器事件")
-    self.OnChangeWeaponDelegate(UsingWeaponSlot, LastSlot)
+    print("BP_UGCPlayerPawn:UGC_ChangeCurrentUsingWeaponEvent Log: -- Call切换武器事件")
+    -- 判空：登录灌回背包时补发的武器会自动装备，这个事件可能早于 ReceiveBeginPlay 创建委托
+    if self.OnChangeWeaponDelegate then
+        self.OnChangeWeaponDelegate(UsingWeaponSlot, LastSlot)
+    end
 end
 
 function BP_UGCPlayerPawn:ReceiveBeginPlay()

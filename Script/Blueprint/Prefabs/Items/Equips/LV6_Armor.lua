@@ -1,4 +1,4 @@
-﻿---@class LV6_Armor_C:Template_Equipment_Armor_C
+---@class LV6_Armor_C:Template_Equipment_Armor_C
 --Edit Below--
 local LV6_Armor = {} 
 

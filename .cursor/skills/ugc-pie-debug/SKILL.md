@@ -79,6 +79,23 @@ local PC   = Pawn and Pawn:GetController()
 
 **不存在**的接口（别再试）：`UGCGameSystem.GetPlayerControllerByIndex`、`UGCGameSystem.GetPlayerControllerByPawn`、`PlayerState:GetPlayerController()`。Pawn→PC 唯一可靠路径是 `Pawn:GetController()`。
 
+已知 UID 时更短：`UGCGameSystem.GetPlayerPawnByUID(10001)`（PIE 单人房 UID 恒为 `10001` = TeamId*10000+ClientId）。
+
+## 玩家存档（ArchiveData）本地调试
+
+- **PIE 下存档确实会落盘、且跨会话可读回** —— API 注释里"存档数据在 PIE 下无法跨对局保存和读取"对本地调试**不成立**（2026-09-20 实测）。
+- 路径：`ShadowTrackerExtra/Saved/ArchiveData/<UGC项目名>/<UID>.json`，即 `.../ShadowTrackerExtra/Saved/ArchiveData/TTS/10001.json`。**注意在游戏工程的 Saved 下，不是 `UGCProjects/TTS/Saved`**。
+- ⚠️ **启动 PIE 前必须在「PIE Client Manager Toolbar」里给每个 UID 槽位选档**（下拉框会自动扫 `ArchiveData/*.json`）。官方规则（wiki `catalog/20460` §3.2）：
+  - **选了本地 json** → 编辑器读它并上传到 DS，DS 端存档以该文件为初始值 → 登录能读到档；
+  - **留空** → 该 UID 进「待拉取列表」，DS Ready 后**反向**由 DS 推送存档给编辑器写本地文件 → DS 端一开始是**空的**，登录读档必然拿到 nil。
+  - 症状：Lua 侧一直 `无存档（首次进入）`，编辑器日志出现 `FUGCSaveDataService::UploadSaveDataForUID - UID=10001 has no local file selection; skipping upload and waiting for remote sync`。**编辑器崩溃/重启后选档会丢**，这是最常见的"存档突然读不到了"原因，别去怀疑业务代码。
+  - 注意写方向不受影响：`SavePlayerArchiveData` 会自动更新本地 json（wiki §5.1），所以"能写不能读"正是选档没选的特征。
+- 文件结构 `{ "<seq>": { ...你的 key... } }`，Tab 缩进，**必须 UTF-8**（中文写坏编码会读不回来）。
+- 可以直接手改这个 json 造脏存档/造初始状态来测兼容性与读档分支，比在 PIE 里点 UI 快得多。**但改前必须先 stop PIE**：DS 内存里持有整档，退出/下次保存时会回写覆盖你的手改。
+- 旧档不会自动清理；换玩法/改 key 后记得手动删档重测，否则会读到上一轮的残留。
+- 读档要等 PostLogin：`ReceiveBeginPlay` 里 `GetUIDBy*` 可能还是 0、`GetPlayerArchiveData` 返回 nil。**只读一次必然拿到空**，要按 0.25s 间隔带重试地读（40 次 ≈ 10s 足够）。别指望 `UGC.Player.PlayerEnter` 广播补读——从 `ReceiveBeginPlay` + 等 Pawn 生成后才注册的监听晚于广播约 43ms，DS 日志会是 `MessageImpl Key[UGC.Player.PlayerEnter] Listener[None]`。
+- 写档一律**整档读改写、只动自己的 key**；根节点不是 table 时 fail-closed 拒绝覆盖，否则会清掉别的系统的数据。
+
 ## reloadlua 的正确心智模型
 
 - 派发所有**已保存到磁盘**的改动文件到 DS 和客户端；没改就不发。

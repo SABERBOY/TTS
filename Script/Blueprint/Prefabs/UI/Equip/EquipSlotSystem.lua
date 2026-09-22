@@ -2,18 +2,16 @@
 ---核心规则：
 ---  六槽位（头盔/衣服/首饰/手套/腰带/鞋子）各保存一个永久强化等级（1-180），账号内四职业共享。
 ---  强化对象是"槽位（装备框）"，不是装备本体；实际生效等级 = min(槽位永久等级, 当前装备品阶强化上限)。
----  强化成功率 100%；槽位从 L-1 升到 L 消耗：金币 = 30 + 3*L，装备零件 = 1 + floor((L-1)/15)。
+---  强化成功率 100%；每级属性与消耗读 EquipStrengthenLevel 表（源：《装备系统-策划配置表.xlsx》"强化逐级"页）。
 ---  服务端权威：等级存 Character 属性集 EquipSlotLv_* 自定义属性（复制），经 ServerRPC_StrengthenEquipSlot 事务修改。
----数值已对照《装备系统-策划配置表.xlsx》校验：
----  单槽 1-180 总消耗 = 54270 金币 / 1170 零件；180 级攻击槽累计 +1000、生命槽累计 +3300。
+---表数据已对照策划配置校验：180 行逐级，单槽 1-180 总消耗 = 54270 金币 / 1170 零件；累计 +1000 攻击 / +3300 生命。
 local EquipSlotSystem = {}
 
 EquipSlotSystem.MAX_LEVEL = 180
 
--- 消耗公式常量（配置表"说明与常量"页：GOLD_BASE/GOLD_PER_LEVEL/PARTS_BAND）
-EquipSlotSystem.GOLD_BASE = 30
-EquipSlotSystem.GOLD_PER_LEVEL = 3
-EquipSlotSystem.PARTS_BAND = 15
+-- 强化逐级曲线表：行名 = 等级(1-180)，列见 EquipStrengthenLevelRow
+-- （Level/ColorStage/AtkPerLevel/HpPerLevel/CumAtk/CumHp/GoldCost/PartsCost/CumGold/CumParts/RankCap）
+EquipSlotSystem.STRENGTHEN_TABLE_PATH = 'Asset/Data/Table/Customized/EquipStrengthenLevel.EquipStrengthenLevel'
 
 -- 装备零件物品 ID 接入点：项目物品表尚未定义"装备零件"，定义后在此填入 ItemID。
 -- 为 nil 时零件校验与扣除跳过（只扣金币），并打印警告。
@@ -43,16 +41,6 @@ EquipSlotSystem.Ranks = {
     { RankID = 'R10_RED',     Order = 10, Name = '红',   Cap = 140, Atk = 135, Hp = 720, SpecialRate = 0.85,  RecycleParts = 760 },
     { RankID = 'R11_RED_1',   Order = 11, Name = '红+1', Cap = 160, Atk = 159, Hp = 840, SpecialRate = 0.925, RecycleParts = 950 },
     { RankID = 'R12_RED_2',   Order = 12, Name = '红+2', Cap = 180, Atk = 180, Hp = 960, SpecialRate = 1.00,  RecycleParts = 1200 },
-}
-
--- 槽位强化每级属性（配置表"强化区间"页；按等级区间逐段累计，升颜色不重算历史等级）
-EquipSlotSystem.StrengthenBands = {
-    { From = 1,   To = 10,  AtkPer = 1,  HpPer = 3 },
-    { From = 11,  To = 20,  AtkPer = 1,  HpPer = 5 },
-    { From = 21,  To = 30,  AtkPer = 2,  HpPer = 7 },
-    { From = 31,  To = 75,  AtkPer = 3,  HpPer = 10 },
-    { From = 76,  To = 120, AtkPer = 5,  HpPer = 20 },
-    { From = 121, To = 180, AtkPer = 10, HpPer = 30 },
 }
 
 -- 十二件固定装备模板（配置表"装备模板"页；SpecialValue 为红+2 上限，实际品阶值 = 上限 * 品阶倍率）
@@ -142,16 +130,62 @@ function EquipSlotSystem.IsDefineIDValid(DefineID)
     return EquipSlotSystem.GetDefineItemID(DefineID) ~= nil
 end
 
----升到目标等级 TargetLevel 的单级消耗
+--==================== 强化逐级表读取（带缓存） ====================
+
+-- 逐级行缓存：Level -> 行数据；false 表示已查过但表中缺失（避免重复失败查询与日志刷屏）
+local LevelRowCache = {}
+
+---读强化逐级表某等级行（结果缓存；等级越界或表缺失返回 nil）
+---@param Level number 强化等级 1-180
+---@return table|nil Row {Level, ColorStage, AtkPerLevel, HpPerLevel, CumAtk, CumHp, GoldCost, PartsCost, CumGold, CumParts, RankCap}
+function EquipSlotSystem.GetLevelRow(Level)
+    Level = math.floor(Level or 0)
+    if Level < 1 or Level > EquipSlotSystem.MAX_LEVEL then
+        return nil
+    end
+    local Cached = LevelRowCache[Level]
+    if Cached ~= nil then
+        return Cached or nil
+    end
+    local Row = nil
+    local OK, Raw = pcall(function()
+        return UGCGameSystem.GetTableDataByRowName(
+            UGCGameSystem.GetUGCResourcesFullPath(EquipSlotSystem.STRENGTHEN_TABLE_PATH), tostring(Level))
+    end)
+    if OK and Raw ~= nil then
+        Row = {
+            Level = tonumber(Raw.Level) or Level,
+            ColorStage = Raw.ColorStage or '',
+            AtkPerLevel = tonumber(Raw.AtkPerLevel) or 0,
+            HpPerLevel = tonumber(Raw.HpPerLevel) or 0,
+            CumAtk = tonumber(Raw.CumAtk) or 0,
+            CumHp = tonumber(Raw.CumHp) or 0,
+            GoldCost = tonumber(Raw.GoldCost) or 0,
+            PartsCost = tonumber(Raw.PartsCost) or 0,
+            CumGold = tonumber(Raw.CumGold) or 0,
+            CumParts = tonumber(Raw.CumParts) or 0,
+            RankCap = Raw.RankCap or '',
+        }
+    else
+        print('[EquipSlotSystem] 强化逐级表读取失败 Level=' .. tostring(Level) .. '（检查 EquipStrengthenLevel 表是否存在）')
+    end
+    LevelRowCache[Level] = Row or false
+    return Row
+end
+
+---升到目标等级 TargetLevel 的单级消耗（读表）
 function EquipSlotSystem.GetGoldCost(TargetLevel)
-    return EquipSlotSystem.GOLD_BASE + EquipSlotSystem.GOLD_PER_LEVEL * TargetLevel
+    local Row = EquipSlotSystem.GetLevelRow(TargetLevel)
+    return Row and Row.GoldCost or 0
 end
 
 function EquipSlotSystem.GetPartsCost(TargetLevel)
-    return 1 + math.floor((TargetLevel - 1) / EquipSlotSystem.PARTS_BAND)
+    local Row = EquipSlotSystem.GetLevelRow(TargetLevel)
+    return Row and Row.PartsCost or 0
 end
 
 ---批量强化消耗：从 FromLevel 强化 Count 级（自动截断到 MAX_LEVEL）
+---用累计列做差 Gold = CumGold(Target) - CumGold(From)，与逐级求和等价
 ---@return number Gold 金币总消耗
 ---@return number Parts 装备零件总消耗
 ---@return number TargetLevel 实际到达等级
@@ -159,12 +193,20 @@ function EquipSlotSystem.GetBatchCost(FromLevel, Count)
     FromLevel = math.max(0, math.floor(FromLevel or 0))
     Count = math.max(1, math.floor(Count or 1))
     local Target = math.min(EquipSlotSystem.MAX_LEVEL, FromLevel + Count)
-    local Gold, Parts = 0, 0
-    for L = FromLevel + 1, Target do
-        Gold = Gold + EquipSlotSystem.GetGoldCost(L)
-        Parts = Parts + EquipSlotSystem.GetPartsCost(L)
+    if Target <= FromLevel then
+        return 0, 0, Target
     end
-    return Gold, Parts, Target
+    local ToRow = EquipSlotSystem.GetLevelRow(Target)
+    if not ToRow then
+        return 0, 0, FromLevel
+    end
+    local FromGold, FromParts = 0, 0
+    if FromLevel > 0 then
+        local FromRow = EquipSlotSystem.GetLevelRow(FromLevel)
+        FromGold = FromRow and FromRow.CumGold or 0
+        FromParts = FromRow and FromRow.CumParts or 0
+    end
+    return ToRow.CumGold - FromGold, ToRow.CumParts - FromParts, Target
 end
 
 ---升至系统上限（180 级）的总消耗
@@ -172,30 +214,19 @@ function EquipSlotSystem.GetToCapCost(FromLevel)
     return EquipSlotSystem.GetBatchCost(FromLevel, EquipSlotSystem.MAX_LEVEL)
 end
 
-function EquipSlotSystem.GetLevelBand(Level)
-    for _, Band in ipairs(EquipSlotSystem.StrengthenBands) do
-        if Level >= Band.From and Level <= Band.To then
-            return Band
-        end
-    end
-    return nil
-end
-
----槽位强化累计属性（按区间逐段累计）
+---槽位强化累计属性（读表累计列；超过上限按 MAX_LEVEL 饱和）
 ---@param Level number 槽位强化等级
 ---@param AttrType string 'Atk' 或 'Hp'
 function EquipSlotSystem.GetSlotBonus(Level, AttrType)
-    Level = math.max(0, math.floor(Level or 0))
-    local Total = 0
-    for _, Band in ipairs(EquipSlotSystem.StrengthenBands) do
-        if Level < Band.From then
-            break
-        end
-        local Hi = math.min(Band.To, Level)
-        local N = Hi - Band.From + 1
-        Total = Total + N * (AttrType == 'Atk' and Band.AtkPer or Band.HpPer)
+    Level = math.min(EquipSlotSystem.MAX_LEVEL, math.max(0, math.floor(Level or 0)))
+    if Level <= 0 then
+        return 0
     end
-    return Total
+    local Row = EquipSlotSystem.GetLevelRow(Level)
+    if not Row then
+        return 0
+    end
+    return AttrType == 'Atk' and Row.CumAtk or Row.CumHp
 end
 
 ---实际生效强化等级 = min(槽位永久等级, 当前装备品阶强化上限)
@@ -500,6 +531,15 @@ function EquipSlotSystem.ServerTryStrengthen(PlayerState, Player, SlotIdx, Count
     -- 升级（Character 属性集 EquipSlotLv_* 为复制属性，客户端自动同步）
     if not EquipSlotSystem.SetSlotLevel(Player, SlotIdx, Target) then
         return false, 'SetLevelFailed'
+    end
+
+    -- 落盘：只把六槽强化等级写入玩家存档。
+    -- 装备/背包物品/货币的跨对局保留由引擎原生负责（物品编辑器的「是否持久化」ShouldPersist），
+    -- 本项目不再自己存一套，否则会和引擎的背包持久化重复且互相干扰。
+    -- 延迟 require：EquipSlotPersist 顶层 require 了本模块，直接互相 require 会形成循环
+    local OKPersist, EquipSlotPersist = pcall(require, 'Script.Blueprint.Prefabs.UI.Equip.EquipSlotPersist')
+    if OKPersist and EquipSlotPersist then
+        EquipSlotPersist.SaveLevels(Player, PlayerState)
     end
 
     -- 刷新槽位强化属性加成（服务端）

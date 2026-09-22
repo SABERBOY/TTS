@@ -1,4 +1,4 @@
----@class SkillTemplate_ToxicGrende_C:PESkillTemplate_Active_C
+---@class SkillTemplate_ToxicGrende_C:PESkillTemplate_Base_C
 --Edit Below--
 local SkillTemplate_ToxicGrende = {}
  

@@ -22,8 +22,12 @@ function UGCAttributeGroup_Character:OnInitGroup()
 
         if OwnerActor and OwnerActor.GetPlayerStateSafety and OwnerActor:GetPlayerStateSafety() then
             local OwnerState = OwnerActor:GetPlayerStateSafety()
-            print("[UGCAttributeGroup_Character] Listen LevelChanged: "..tostring(OwnerState))
-            OwnerState.OnLevelChanged:Add(self.InitLevelRelated, self)
+            -- 等级系统是可选的：本项目 UGCPlayerState 没有 OnLevelChanged 委托
+            -- （也没有 UGCPlayerLevel 字段和 Asset/Data/Level 配表），没委托就不订阅
+            if OwnerState.OnLevelChanged then
+                print("[UGCAttributeGroup_Character] Listen LevelChanged: "..tostring(OwnerState))
+                OwnerState.OnLevelChanged:Add(self.InitLevelRelated, self)
+            end
         end
     end)
 
@@ -65,8 +69,14 @@ function UGCAttributeGroup_Character:InitLevelRelated()
         print("[UGCAttributeGroup_Character] InitLevelRelated: "..tostring(OwnerState))
         if OwnerState then
             -- local player = self:GetPlayerCharacter()
+            local PlayerLevel = OwnerState.UGCPlayerLevel
+            -- 没接等级系统时 UGCPlayerLevel 为 nil，下面 LvGlobalCfg 分支要做 PlayerLevel - 1，
+            -- nil 会直接抛算术错误；等级表也读不到，这里直接返回
+            if not PlayerLevel then
+                return
+            end
             -- 设置等级对应的属性值
-            local LvCfg = UGCGameData.GetLevelConfig(OwnerState.UGCPlayerLevel)
+            local LvCfg = UGCGameData.GetLevelConfig(PlayerLevel)
             if LvCfg then
                 for _, AttributeCfg in pairs(LvCfg.Attributes) do
                     UGCAttributeSystem.SetGameAttributeValue(OwnerActor, AttributeCfg.Attribute.AttributeName, AttributeCfg.Value)
@@ -77,10 +87,10 @@ function UGCAttributeGroup_Character:InitLevelRelated()
             -- 设置等级对应的增量
             local LvGlobalCfg = UGCGameData.GetGlobalLevelConfig()
             if LvGlobalCfg then
-                UGCAttributeSystem.SetGameAttributeValue(OwnerActor, 'BaseHealth', self.BaseHealth + LvGlobalCfg.HealthDelta * (OwnerState.UGCPlayerLevel - 1))
-                UGCAttributeSystem.SetGameAttributeValue(OwnerActor, 'MaxMagic', self.OrignalMagic + LvGlobalCfg.MagicDelta * (OwnerState.UGCPlayerLevel - 1))
+                UGCAttributeSystem.SetGameAttributeValue(OwnerActor, 'BaseHealth', self.BaseHealth + LvGlobalCfg.HealthDelta * (PlayerLevel - 1))
+                UGCAttributeSystem.SetGameAttributeValue(OwnerActor, 'MaxMagic', self.OrignalMagic + LvGlobalCfg.MagicDelta * (PlayerLevel - 1))
                 -- UGCAttributeSystem.SetGameAttributeValue(OwnerActor, 'Defence', self.Defence + LvGlobalCfg.DefenceDelta * (OwnerState.UGCPlayerLevel - 1))
-                print("[UGCAttributeGroup_Character] MaxMagic: "..self.OrignalMagic..', Level: '..OwnerState.UGCPlayerLevel..', magic delta:'..LvGlobalCfg.MagicDelta)
+                print("[UGCAttributeGroup_Character] MaxMagic: "..self.OrignalMagic..', Level: '..PlayerLevel..', magic delta:'..LvGlobalCfg.MagicDelta)
             end
         end
     end  

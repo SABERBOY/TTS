@@ -47,10 +47,6 @@ end
 function BP_HeroSkillSingleExamples:ReceiveBeginPlay()
     BP_HeroSkillSingleExamples.SuperClass.ReceiveBeginPlay(self)
 
-    local SkillCDO = STExtraGameplayStatics.GetClassDefaultObject(self.Skill)
-    local SKillName = SkillCDO.UIInfo.SKillName
-    local SkillDetail = SkillCDO.UIInfo.SkillDetail
-
     -- 服务器生成怪物并绑定重生逻辑
     if UGCGameSystem.IsServer() then
         if UE.IsValid(self.SpawnMonsterClass) then
@@ -58,10 +54,20 @@ function BP_HeroSkillSingleExamples:ReceiveBeginPlay()
         else
             print("BP_HeroSkillSingleExamples:ReceiveBeginPlay 没有配置可用的怪物类 SpawnMonsterClass")
         end
-    else
-        self.Widget2.Widget.TextBlock_Title:SetText("" .. tostring(SKillName))
-        self.Widget1.Widget.TextBlock_Title:SetText("" .. tostring(SkillDetail))
+        return
     end
+
+    -- Skill 是逐个实例在编辑器里配的，示例关卡里有没配的空实例，
+    -- GetClassDefaultObject(nil) 返回 nil；而 UIInfo 只有客户端刷界面文本时才用得到
+    local SkillCDO = UE.IsValid(self.Skill) and STExtraGameplayStatics.GetClassDefaultObject(self.Skill)
+    local UIInfo = SkillCDO and SkillCDO.UIInfo
+    if not UIInfo then
+        print("BP_HeroSkillSingleExamples:ReceiveBeginPlay 没有配置可用的技能类 Skill，跳过界面文本")
+        return
+    end
+
+    self.Widget2.Widget.TextBlock_Title:SetText("" .. tostring(UIInfo.SKillName))
+    self.Widget1.Widget.TextBlock_Title:SetText("" .. tostring(UIInfo.SkillDetail))
 end
 
 function BP_HeroSkillSingleExamples:SpawnCurrentMonster()
