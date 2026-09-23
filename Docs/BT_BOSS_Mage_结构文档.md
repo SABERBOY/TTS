@@ -408,48 +408,5 @@ Selector                                                    ← 根
 2. **绕行接近**：`FindAReachablePosByDirection(Center=Target, Distance=1500~2500, SerachRange=250~1000) → MoveToEx(BlackboardKey=TargetPosition)`；
 3. **回巢/巡逻**：`FindAReachablePos(FindCenter=SpawnLoc) → MoveToEx(BlackboardKey=TargetPosition)`（+ `Blackboard(TargetPosition IsSet)` 装饰器挂在移动任务上）。
 
----
-
-## 十二、CCP 修复记录（2026-09-22 执行，已 PIE 验证）
-
-> 依据第五节"对照与改法建议"，通过 UGC MCP 脚本直接修复 CCP 运行时树与怪物参数，并完成 PIE 运行期验证。
-
-### 12.1 修复项
-| # | 问题 | 修复 |
-|---|---|---|
-| 1 | 寻敌服务 `SvcChoose` 被 `DecHasTarget` 门控（无目标时不 Tick，死锁） | 新建 `CombatGate`(Selector) 承载 DecHasTarget；服务所在的 `[0.1]` 去除门控；巡逻分支 `Selector_4` 并入 `[0.1]` |
-| 2 | 绑平台黑板 `BB_UGC_Generic_Base`，缺 `TargetPosition/bPhase2/LastCast` 等键 | 改绑 `/TTS/Asset/AI/BB_SUPER_MONSTER` |
-| 3 | 键模式引用失效（含未启用的 ValueKey 残留） | `PursuitMoveSpeed→PursuitSpeed`、`PatrolMoveSpeed→PatrolSpeed`、TimeCheck_9 `→LastCast` |
-| 4 | 转阶段门控 `DecNoPhase` 键错误（`SelfActor` IsNotSet 恒不通过） | 改为 `bPhase2`（IsNotSet） |
-| 5 | 战斗中只放技能不接近（技能分支总成功，走位/追击永不执行） | 新增 `ApproachByDir`（`FindAReachablePosByDirection(Target)` → `MoveToEx(TargetPosition)`，距离>1200 门控）并置于技能分支之前 |
-| 6 | 寻敌服务开启 EnemyDistance 策略时不生效 | `EnableEnemyDistanceStrategy=False`（对齐法师：三套策略全关） |
-| 7 | 巡逻 `FindAReachablePos` 以 `SpawnLoc`（Z≈2，低于导航面）为中心找不到点 | `FindCenter` 改 `SelfActor` |
-| 8 | 换黑板后怪物参数表为空（键集未迁移） | 在 SuperMonster 蓝图 `BehaviorControlComp.BehaviorTreeSetting` 补写 `PursuitSpeed=1200 / PatrolSpeed=600 / ChangeStagetHP=600000 / Skill_1~3_* / bPatrol` 等 |
-
-### 12.2 修复后结构（要点）
-```
-[0] Root
-├─ [0.0] 转阶段 Sequence  gates: AttrObserve(Health ≤ ChangeStagetHP 键模式) + DecNoPhase(bPhase2 IsNotSet)
-└─ [0.1] Selector_10 (Svc: 寻敌)   ← 无门控（服务常驻 Tick）
-   ├─ [0.1.0] CombatGate  gates: DecHasTarget
-   │    ├─ Sequence_1（发送 EnterBattle + 设置 Battle 状态）
-   │    ├─ ApproachByDir（接近：FindAReachablePosByDirection → MoveToEx(TargetPosition)）
-   │    └─ Selector_2（技能分支 ×6）
-   └─ [0.1.1] Selector_4  gates: DecNoTarget
-        ├─ Sequence_7（发送 ExitBattle + 清除 Battle）
-        └─ Sequence_8（巡逻：FindAReachablePos(SelfActor) → MoveToEx(TargetPosition) → Wait）
-```
-
-### 12.3 PIE 验收结果（2026-09-22 16:29–16:57，DebugID `_dkfffplhhwy8w8` / `_dkfffplhhwyrpk`）
-- 自动索敌 ✓（黑板 `Target` 被服务自动写入，无需人工注入）
-- 进入战斗 ✓（`PawnState.Action.Battle`）
-- 追击位移 ✓（与玩家距离 1500 → 482）
-- 技能释放 ✓（魔术粘弹 / 充能射线 / BossPassive 系列）
-- 脱战与巡逻 ✓（`ExitBattle` 后 `PawnState.Movement.Walking` 持续切换，`TargetPosition` 每轮刷新）
-
-### 12.4 遗留与备份
-- `UGCBehaviorTreeGraph`（BT 编辑器图）由脚本编辑的运行时树未完全同步；运行时（PIE/游戏）以运行时树为准，已验证正常。打开 BT 编辑器时如发现图与本文档结构不一致，请勿直接保存覆盖，或重新整理图后保存。
-- 备份：`Docs/_backup/CCP.uasset.20260922.bak`、`SuperMonster.uasset.20260922.bak`、`BB_SUPER_MONSTER.uasset.20260922.bak`。
-
 
 
