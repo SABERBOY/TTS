@@ -1,5 +1,54 @@
 # BOSS AI 实施计划（基于真实仓库审查）
 
+## 2026-09-23 当前实施基线
+
+用户已确认在 **TTS** 使用方案 A：Lua 核心、UGC 原生 BT/BB、Lua BT 节点、灰盒七技能，复用 `SuperMonster` 与 `UGCmap`，双 Boss 隔离纳入最终验收。这个项目是定制 UE4.18.1 UGC Lua 工程，没有可编译的 C++ `Source`/`Build.cs`；因此原规格的 Native Enum/C++ 类与 Editor 模块需作为环境差异记录，不能写成已实现。Git 工作树有并行用户/agent 改动，保留现状。
+
+### 当前交付与证据
+
+| 阶段 | 当前状态 | 证据及尚缺内容 |
+|---|---|---|
+| A：配置、决策、状态 | 七技能配置和 `Config.Validate(skills)`、权重/重复/预算/喘息、危险登记与有限寿命已落地；纯 Lua 用例通过 | [VERIFICATION.md](VERIFICATION.md) 的最新本地测试结果；纯逻辑不能替代 DS 战斗。 |
+| B：BB、BT、感知 | `BB_Boss` 14 个自定义键及引擎自动 `SelfActor`；`BT_Boss` 26 个全连通图节点、17 条子边 Decorator、7 条技能路由，服务挂在无门控 `BossPriority`；Cook 与 DS 根节点加载、玩家感知入战已读回 | `ActionKind`/`SelectedSkill` 为 UGC **Int**，不是原规格 Native Enum。DS 已执行 Chase/Search 分支，但移动请求失败；柱子遮挡与 Idle 全时序未验。 |
+| C：动作生命周期和移动 | `BossAI_SkillRuntime`、`BossAI_Graybox`、BT Task、清理/看门狗和每 Pawn 状态在代码及替身测试中存在 | 干净 DS 的 Chase/Search 曾反复 `move-request-failed`。正在诊断导航与有界退避；Windup/Active/Recovery 各阶段真实 Abort 和移动所有权未完成 PIE 验收。 |
+| D：七技能与表现 | 七槽配置、灰盒预警/投射/地面安全通道逻辑和客户端警示代码存在，独立 Lua 用例覆盖多个几何及清理边界 | 最近 `Graybox.Prepare` 已补传 `ctx.target` 给 `HasClearDamagePath`，本地回归通过；**修复后 PIE 尚未重启验证**。现有 DS `TakeDamage` 行不能直接归因新七技能。 |
+| E：资产和双 Boss 验收 | `repair_bt_boss_route.py` 只读目标结构校验、LinuxServer Cook 和 DS `BossPriority` 加载已有证据；验证矩阵已列出 24 项 | 还需单 Boss 七技能/遮挡/阶段/喘息/清理的真实 PIE，再做两只 Boss 共用 BT 的隔离测试。新测试地图未创建；按用户已接受的 `UGCmap` 划区执行。 |
+
+`BTService_BossUpdateContext` 放在 `BossPriority`，使 `CombatActive=false` 时仍能发现目标；这是对原规格中 Combat 挂点的 UGC 适配。`repair_bt_boss_route.py` 的 `verify` 只核结构与对象归属，不替代 BB 全字段、Service 间隔、Task 参数及 DS 行为逐项回读。不要对当前已修复的树运行旧的全删重画步骤。
+
+**§13 测试地图差异**：用户此前已确认使用现有 `UGCmap` 划区并把双 Boss 纳入首轮验收。当前地图只读审计仅见 `UGCmap.umap`，`StartMapName=/TTS/UGCmap`，对应唯一 `Navmesh/UGCmap.navmesh`；原 prompt 提议的独立 `L_BossAITest` 地图尚未创建，不能在交付中写成已完成。
+
+### 下一段可执行工作
+
+1. 完成 `MoveToActor`/`MoveToLocation` 失败原因与失败退避诊断；在新干净 PIE/DS 记录请求返回、导航路径、位置变化、失败频率。**最终移动结果待主任务补录。**
+2. 重新 Cook/启动干净 PIE，复验最近 `Graybox.Prepare` 目标过滤修复及警示/实际伤害归属；避免把原有 `SuperMonster` 攻击日志记为七技能证据。
+3. 按 [VERIFICATION.md](VERIFICATION.md) 的 24 项矩阵补真实场景：无目标 Idle、感知与遮挡、七技能预警和命中、各阶段 Abort、危险清理/喘息、一次性转阶段、目标失效和双 Boss 隔离。每项记录新日志、时刻、实际输出与失败原因。
+4. 资产变动后重新卸载/加载并执行 `BT_ROUTE_MODE='verify'`；Cook 重新计算哈希并在 DS 读回根与具体路由。当前保存的资产不要因旧文档手工步骤被删除。
+
+<details>
+<summary>历史计划与阶段记录（2026-09-22 至 2026-09-23 较早快照；不作为当前操作指令）</summary>
+
+## 2026-09-23 当前执行计划
+
+本节是本次执行的当前基线；下方 2026-09-22 记录保留为历史。用户已要求在当前 TTS 项目执行原规格，并允许使用 UGC MCP。当前工程是定制 UE4.18.1 UGC 项目，交付方式沿用已选定的 Lua 核心 + 原生 BT/BB + Lua BT 节点。原规格中的 C++ 模块和 UE4.27/UE5 构建不适用于此工程，不能据此宣称已完成。
+
+### 已核实的现状
+
+- 当前目录是 Git 仓库；Boss AI、SuperMonster、法师树、CCP、Navmesh 均有用户未提交改动，包含暂存与未暂存内容。以下只改本任务所需文件，不提交或还原现有内容。
+- `Script/AI/Boss/BossAI_{Types,Config,Random,State,Decision,Tests}.lua` 已存在。旧记录的 29/29 仅证明 2026-09-22 的纯逻辑测试，不能证明当前代码或战斗集成。
+- `BB_Boss`、`BT_Boss` 和 Boss BT 节点资产已创建。当前 `BT_Boss` 图节点由脚本创建，历史 DS 日志显示编辑器图类加载失败，尚不能视为可运行树。
+- `BTTask_BossPlanNextAction.lua` 尚未调用决策模块；`BTTask_BossExecuteSkill.lua` 与 `BTTask_BossGiveSpace.lua` 仍是立即完成的占位实现；感知服务以距离近似视线且遮挡后读取目标实时位置。
+
+### 阶段与完成判据
+
+1. **A：决策和状态修正。** 在 `BossAI_State.lua`、`BossAI_Decision.lua` 与对应测试中修复追击计入预算、按候选技能预测危险失效时刻、喘息中止/恢复与危险超时等边界；用本地 Lua 或 DS 重新运行测试，记录新输出。
+2. **B：真实资产与感知入口。** 用 UGC MCP 回读 `BB_Boss`、`BT_Boss`、节点绑定与 SuperMonster。修复 BT 运行节点对编辑器图对象的依赖，保存重载并在 DS 证明能启动。将目标发现放在不受 `CombatActive` 门控的位置；视线、最后已知位置、距离分别按实际观察更新。
+3. **C：动作生命周期。** 每 BOSS 独立状态、异步 Windup/Active/Recovery、Abort/死亡/归位清理、移动所有权和真正的 DrainThreats → 2 秒 Breathing。先让 S1/S3/S5 在灰盒中产生可躲避的实际伤害。
+4. **D：补齐七技能。** 实现 S2/S4/S6/S7 的预警、命中、有限危险寿命、安全通道拒绝、阶段切换和调试信息；不以日志输出代替伤害与位移。
+5. **E：集成验证。** 保存重载读回 BT/BB/蓝图连接，运行单 BOSS 与双 BOSS PIE/DS，覆盖遮挡、撞墙、打空、喘息、Abort、阶段、重置；更新 `SETUP_AND_TUNING.md`、`VERIFICATION.md`、必要手工资产步骤。
+
+所有阶段以真实回读和运行结果为完成依据。现有编辑器图可能触发 DS 加载失败；若 UGC MCP 无法安全修复编辑器专属资源，交付已验证代码、精确的编辑器操作步骤和未通过项，不把脚本图或占位任务算作完成。
+
 > 依据：`Docs/Codex_UE_Boss_BehaviorTree_Prompt.md` 规格
 > 审查时间：2026-09-22
 > 结论摘要：**当前仓库不包含 C++ 工程与编译环境，规格中的"C++ 核心"部分无法按原文实施**；其余目标可在 UGC 环境以 Lua + 原生 BT/BB + 蓝图任务/服务落地。**等待用户确认方案后再进入实施阶段。**
@@ -119,3 +168,5 @@
 - BT 图/树同步受 UGC 图 API 约束，详见 `Docs/UGCBehaviorTreeGraph_同步机制与验证.md`（结构改动优先在 BT 编辑器 UI 内完成）。
 
 > 未完成部分不得视为已验证（规格 §0.8 / §14 末段）。
+
+</details>

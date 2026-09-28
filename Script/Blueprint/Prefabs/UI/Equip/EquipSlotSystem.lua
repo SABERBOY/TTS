@@ -64,7 +64,16 @@ function EquipSlotSystem.GetSlotDef(SlotIdx)
 end
 
 function EquipSlotSystem.GetRank(RankOrder)
-    return EquipSlotSystem.Ranks[RankOrder]
+    local Rank = EquipSlotSystem.Ranks[RankOrder]
+    if Rank then
+        -- Query after world initialization: LuaCheck imports must not read tables.
+        local Config = require('Script.Blueprint.Prefabs.UI.Equip.Advance.EquipAdvanceConfig')
+        local AdvanceRank = Config.Ranks[RankOrder]
+        if AdvanceRank then
+            for Key, Value in pairs(AdvanceRank) do Rank[Key] = Value end
+        end
+    end
+    return Rank
 end
 
 ---槽位对应的人物属性名（Character 属性集自定义属性）
@@ -386,12 +395,16 @@ function EquipSlotSystem.GetItemName(DefineID, ItemID)
     return Name or ''
 end
 
----由背包 DefineID 识别装备品阶序号（1-12）：按内核物品品质映射，读不到品质按白装(1)。
+---由明确的 ItemID 阶位配置识别装备品阶；未接入的新旧物品保留原品质映射。
 ---服务端（EquipSlotAttrApplier）与客户端 UI 共用，GetItemQualityV2* 两端均可用。
 function EquipSlotSystem.GetEquipRankOrder(DefineID)
     if not EquipSlotSystem.IsDefineIDValid(DefineID) then
         return nil
     end
+    local AdvanceConfig = require('Script.Blueprint.Prefabs.UI.Equip.Advance.EquipAdvanceConfig')
+    local ItemID = EquipSlotSystem.GetDefineItemID(DefineID)
+    local AdvanceItem = AdvanceConfig.Items[ItemID]
+    if AdvanceItem then return AdvanceItem.RankOrder end
     local Quality = EquipSlotSystem.GetItemQuality(DefineID)
     local Order = Quality ~= nil and EquipSlotSystem.QualityToRankOrder[Quality] or nil
     if not Order then

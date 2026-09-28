@@ -1,0 +1,517 @@
+{
+  "EquipAdvanceRank": [
+    {
+      "Minor": 0,
+      "Cap": 10,
+      "Order": 1,
+      "RecycleParts": 12,
+      "RankID": "R01_WHITE",
+      "Major": 1,
+      "DisplayName": "白",
+      "Name": "R01_WHITE"
+    },
+    {
+      "Minor": 0,
+      "Cap": 20,
+      "Order": 2,
+      "RecycleParts": 30,
+      "RankID": "R02_GREEN",
+      "Major": 2,
+      "DisplayName": "绿",
+      "Name": "R02_GREEN"
+    },
+    {
+      "Minor": 0,
+      "Cap": 30,
+      "Order": 3,
+      "RecycleParts": 70,
+      "RankID": "R03_BLUE",
+      "Major": 3,
+      "DisplayName": "蓝",
+      "Name": "R03_BLUE"
+    },
+    {
+      "Minor": 0,
+      "Cap": 45,
+      "Order": 4,
+      "RecycleParts": 140,
+      "RankID": "R04_PURPLE",
+      "Major": 4,
+      "DisplayName": "紫",
+      "Name": "R04_PURPLE"
+    },
+    {
+      "Minor": 1,
+      "Cap": 60,
+      "Order": 5,
+      "RecycleParts": 180,
+      "RankID": "R05_PURPLE_1",
+      "Major": 4,
+      "DisplayName": "紫+1",
+      "Name": "R05_PURPLE_1"
+    },
+    {
+      "Minor": 2,
+      "Cap": 75,
+      "Order": 6,
+      "RecycleParts": 230,
+      "RankID": "R06_PURPLE_2",
+      "Major": 4,
+      "DisplayName": "紫+2",
+      "Name": "R06_PURPLE_2"
+    },
+    {
+      "Minor": 0,
+      "Cap": 90,
+      "Order": 7,
+      "RecycleParts": 340,
+      "RankID": "R07_ORANGE",
+      "Major": 5,
+      "DisplayName": "橙",
+      "Name": "R07_ORANGE"
+    },
+    {
+      "Minor": 1,
+      "Cap": 105,
+      "Order": 8,
+      "RecycleParts": 430,
+      "RankID": "R08_ORANGE_1",
+      "Major": 5,
+      "DisplayName": "橙+1",
+      "Name": "R08_ORANGE_1"
+    },
+    {
+      "Minor": 2,
+      "Cap": 120,
+      "Order": 9,
+      "RecycleParts": 520,
+      "RankID": "R09_ORANGE_2",
+      "Major": 5,
+      "DisplayName": "橙+2",
+      "Name": "R09_ORANGE_2"
+    },
+    {
+      "Minor": 0,
+      "Cap": 140,
+      "Order": 10,
+      "RecycleParts": 760,
+      "RankID": "R10_RED",
+      "Major": 6,
+      "DisplayName": "红",
+      "Name": "R10_RED"
+    },
+    {
+      "Minor": 1,
+      "Cap": 160,
+      "Order": 11,
+      "RecycleParts": 950,
+      "RankID": "R11_RED_1",
+      "Major": 6,
+      "DisplayName": "红+1",
+      "Name": "R11_RED_1"
+    },
+    {
+      "Minor": 2,
+      "Cap": 180,
+      "Order": 12,
+      "RecycleParts": 1200,
+      "RankID": "R12_RED_2",
+      "Major": 6,
+      "DisplayName": "红+2",
+      "Name": "R12_RED_2"
+    }
+  ],
+  "EquipAdvanceRule": [
+    {
+      "Diamond": 0,
+      "Materials": 1,
+      "Gold": 100,
+      "Name": "R01_WHITE",
+      "RankID": "R01_WHITE"
+    },
+    {
+      "Diamond": 0,
+      "Materials": 1,
+      "Gold": 200,
+      "Name": "R02_GREEN",
+      "RankID": "R02_GREEN"
+    },
+    {
+      "Diamond": 1,
+      "Materials": 1,
+      "Gold": 400,
+      "Name": "R03_BLUE",
+      "RankID": "R03_BLUE"
+    },
+    {
+      "Diamond": 1,
+      "Materials": 1,
+      "Gold": 500,
+      "Name": "R04_PURPLE",
+      "RankID": "R04_PURPLE"
+    },
+    {
+      "Diamond": 1,
+      "Materials": 2,
+      "Gold": 650,
+      "Name": "R05_PURPLE_1",
+      "RankID": "R05_PURPLE_1"
+    },
+    {
+      "Diamond": 2,
+      "Materials": 1,
+      "Gold": 800,
+      "Name": "R06_PURPLE_2",
+      "RankID": "R06_PURPLE_2"
+    },
+    {
+      "Diamond": 2,
+      "Materials": 1,
+      "Gold": 950,
+      "Name": "R07_ORANGE",
+      "RankID": "R07_ORANGE"
+    },
+    {
+      "Diamond": 2,
+      "Materials": 2,
+      "Gold": 1100,
+      "Name": "R08_ORANGE_1",
+      "RankID": "R08_ORANGE_1"
+    },
+    {
+      "Diamond": 4,
+      "Materials": 1,
+      "Gold": 1400,
+      "Name": "R09_ORANGE_2",
+      "RankID": "R09_ORANGE_2"
+    },
+    {
+      "Diamond": 4,
+      "Materials": 2,
+      "Gold": 1700,
+      "Name": "R10_RED",
+      "RankID": "R10_RED"
+    },
+    {
+      "Diamond": 6,
+      "Materials": 3,
+      "Gold": 2200,
+      "Name": "R11_RED_1",
+      "RankID": "R11_RED_1"
+    }
+  ],
+  "EquipAdvanceItem": [
+    {
+      "SlotIdx": 6,
+      "ItemID": 8310093,
+      "Series": "EQ_SHOES_02",
+      "RankID": "R01_WHITE",
+      "Name": "8310093",
+      "NextItemID": 0
+    },
+    {
+      "NextItemID": 8310094,
+      "SlotIdx": 6,
+      "ItemID": 8310095,
+      "Series": "EQ_SHOES_01",
+      "RankID": "R01_WHITE",
+      "Name": "8310095"
+    },
+    {
+      "SlotIdx": 6,
+      "ItemID": 8310094,
+      "Series": "EQ_SHOES_01",
+      "RankID": "R02_GREEN",
+      "Name": "8310094",
+      "NextItemID": 0
+    },
+    {
+      "NextItemID": 8310096,
+      "SlotIdx": 1,
+      "ItemID": 8310097,
+      "Series": "EQ_HEAD_02",
+      "RankID": "R01_WHITE",
+      "Name": "8310097"
+    },
+    {
+      "SlotIdx": 1,
+      "ItemID": 8310096,
+      "Series": "EQ_HEAD_02",
+      "RankID": "R02_GREEN",
+      "Name": "8310096",
+      "NextItemID": 0
+    },
+    {
+      "NextItemID": 8310098,
+      "SlotIdx": 1,
+      "ItemID": 8310099,
+      "Series": "EQ_HEAD_01",
+      "RankID": "R01_WHITE",
+      "Name": "8310099"
+    },
+    {
+      "SlotIdx": 1,
+      "ItemID": 8310098,
+      "Series": "EQ_HEAD_01",
+      "RankID": "R02_GREEN",
+      "Name": "8310098",
+      "NextItemID": 0
+    },
+    {
+      "NextItemID": 8310105,
+      "SlotIdx": 4,
+      "ItemID": 8310106,
+      "Series": "EQ_GLOVE_02",
+      "RankID": "R01_WHITE",
+      "Name": "8310106"
+    },
+    {
+      "NextItemID": 8310104,
+      "SlotIdx": 4,
+      "ItemID": 8310105,
+      "Series": "EQ_GLOVE_02",
+      "RankID": "R02_GREEN",
+      "Name": "8310105"
+    },
+    {
+      "NextItemID": 8310103,
+      "SlotIdx": 4,
+      "ItemID": 8310104,
+      "Series": "EQ_GLOVE_02",
+      "RankID": "R03_BLUE",
+      "Name": "8310104"
+    },
+    {
+      "NextItemID": 8310102,
+      "SlotIdx": 4,
+      "ItemID": 8310103,
+      "Series": "EQ_GLOVE_02",
+      "RankID": "R04_PURPLE",
+      "Name": "8310103"
+    },
+    {
+      "NextItemID": 8310101,
+      "SlotIdx": 4,
+      "ItemID": 8310102,
+      "Series": "EQ_GLOVE_02",
+      "RankID": "R05_PURPLE_1",
+      "Name": "8310102"
+    },
+    {
+      "NextItemID": 8310100,
+      "SlotIdx": 4,
+      "ItemID": 8310101,
+      "Series": "EQ_GLOVE_02",
+      "RankID": "R06_PURPLE_2",
+      "Name": "8310101"
+    },
+    {
+      "SlotIdx": 4,
+      "ItemID": 8310100,
+      "Series": "EQ_GLOVE_02",
+      "RankID": "R07_ORANGE",
+      "Name": "8310100",
+      "NextItemID": 0
+    },
+    {
+      "NextItemID": 8310112,
+      "SlotIdx": 4,
+      "ItemID": 8310113,
+      "Series": "EQ_GLOVE_01",
+      "RankID": "R01_WHITE",
+      "Name": "8310113"
+    },
+    {
+      "NextItemID": 8310111,
+      "SlotIdx": 4,
+      "ItemID": 8310112,
+      "Series": "EQ_GLOVE_01",
+      "RankID": "R02_GREEN",
+      "Name": "8310112"
+    },
+    {
+      "NextItemID": 8310110,
+      "SlotIdx": 4,
+      "ItemID": 8310111,
+      "Series": "EQ_GLOVE_01",
+      "RankID": "R03_BLUE",
+      "Name": "8310111"
+    },
+    {
+      "NextItemID": 8310109,
+      "SlotIdx": 4,
+      "ItemID": 8310110,
+      "Series": "EQ_GLOVE_01",
+      "RankID": "R04_PURPLE",
+      "Name": "8310110"
+    },
+    {
+      "NextItemID": 8310108,
+      "SlotIdx": 4,
+      "ItemID": 8310109,
+      "Series": "EQ_GLOVE_01",
+      "RankID": "R05_PURPLE_1",
+      "Name": "8310109"
+    },
+    {
+      "NextItemID": 8310107,
+      "SlotIdx": 4,
+      "ItemID": 8310108,
+      "Series": "EQ_GLOVE_01",
+      "RankID": "R06_PURPLE_2",
+      "Name": "8310108"
+    },
+    {
+      "SlotIdx": 4,
+      "ItemID": 8310107,
+      "Series": "EQ_GLOVE_01",
+      "RankID": "R07_ORANGE",
+      "Name": "8310107",
+      "NextItemID": 0
+    },
+    {
+      "NextItemID": 8310114,
+      "SlotIdx": 2,
+      "ItemID": 8310115,
+      "Series": "EQ_CHEST_02",
+      "RankID": "R01_WHITE",
+      "Name": "8310115"
+    },
+    {
+      "SlotIdx": 2,
+      "ItemID": 8310114,
+      "Series": "EQ_CHEST_02",
+      "RankID": "R02_GREEN",
+      "Name": "8310114",
+      "NextItemID": 0
+    },
+    {
+      "NextItemID": 8310116,
+      "SlotIdx": 2,
+      "ItemID": 8310117,
+      "Series": "EQ_CHEST_01",
+      "RankID": "R01_WHITE",
+      "Name": "8310117"
+    },
+    {
+      "SlotIdx": 2,
+      "ItemID": 8310116,
+      "Series": "EQ_CHEST_01",
+      "RankID": "R02_GREEN",
+      "Name": "8310116",
+      "NextItemID": 0
+    },
+    {
+      "NextItemID": 8310118,
+      "SlotIdx": 5,
+      "ItemID": 8310119,
+      "Series": "EQ_BELT_02",
+      "RankID": "R01_WHITE",
+      "Name": "8310119"
+    },
+    {
+      "SlotIdx": 5,
+      "ItemID": 8310118,
+      "Series": "EQ_BELT_02",
+      "RankID": "R02_GREEN",
+      "Name": "8310118",
+      "NextItemID": 0
+    },
+    {
+      "NextItemID": 8310120,
+      "SlotIdx": 5,
+      "ItemID": 8310121,
+      "Series": "EQ_BELT_01",
+      "RankID": "R01_WHITE",
+      "Name": "8310121"
+    },
+    {
+      "SlotIdx": 5,
+      "ItemID": 8310120,
+      "Series": "EQ_BELT_01",
+      "RankID": "R02_GREEN",
+      "Name": "8310120",
+      "NextItemID": 0
+    },
+    {
+      "NextItemID": 8310127,
+      "SlotIdx": 3,
+      "ItemID": 8310128,
+      "Series": "EQ_ACCESSORY_02",
+      "RankID": "R01_WHITE",
+      "Name": "8310128"
+    },
+    {
+      "NextItemID": 8310126,
+      "SlotIdx": 3,
+      "ItemID": 8310127,
+      "Series": "EQ_ACCESSORY_02",
+      "RankID": "R02_GREEN",
+      "Name": "8310127"
+    },
+    {
+      "NextItemID": 8310125,
+      "SlotIdx": 3,
+      "ItemID": 8310126,
+      "Series": "EQ_ACCESSORY_02",
+      "RankID": "R03_BLUE",
+      "Name": "8310126"
+    },
+    {
+      "NextItemID": 8310124,
+      "SlotIdx": 3,
+      "ItemID": 8310125,
+      "Series": "EQ_ACCESSORY_02",
+      "RankID": "R04_PURPLE",
+      "Name": "8310125"
+    },
+    {
+      "NextItemID": 8310123,
+      "SlotIdx": 3,
+      "ItemID": 8310124,
+      "Series": "EQ_ACCESSORY_02",
+      "RankID": "R05_PURPLE_1",
+      "Name": "8310124"
+    },
+    {
+      "NextItemID": 8310122,
+      "SlotIdx": 3,
+      "ItemID": 8310123,
+      "Series": "EQ_ACCESSORY_02",
+      "RankID": "R06_PURPLE_2",
+      "Name": "8310123"
+    },
+    {
+      "SlotIdx": 3,
+      "ItemID": 8310122,
+      "Series": "EQ_ACCESSORY_02",
+      "RankID": "R07_ORANGE",
+      "Name": "8310122",
+      "NextItemID": 0
+    },
+    {
+      "NextItemID": 8310130,
+      "SlotIdx": 3,
+      "ItemID": 8310131,
+      "Series": "EQ_ACCESSORY_01",
+      "RankID": "R01_WHITE",
+      "Name": "8310131"
+    },
+    {
+      "NextItemID": 8310129,
+      "SlotIdx": 3,
+      "ItemID": 8310130,
+      "Series": "EQ_ACCESSORY_01",
+      "RankID": "R02_GREEN",
+      "Name": "8310130"
+    },
+    {
+      "SlotIdx": 3,
+      "ItemID": 8310129,
+      "Series": "EQ_ACCESSORY_01",
+      "RankID": "R03_BLUE",
+      "Name": "8310129",
+      "NextItemID": 0
+    }
+  ]
+}

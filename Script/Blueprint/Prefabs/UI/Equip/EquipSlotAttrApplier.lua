@@ -6,6 +6,7 @@
 ---  - 不限量额外词条（EquipAffixSystem）：实例 CustomData.ExtraAffixes 引用的模板，按同 EffectiveLevel 逐条差值应用。
 local EquipSlotSystem = require('Script.Blueprint.Prefabs.UI.Equip.EquipSlotSystem')
 local EquipAffixSystem = require('Script.Blueprint.Prefabs.UI.Equip.EquipAffixSystem')
+local EquipAdvanceGuard = require('Script.Blueprint.Prefabs.UI.Equip.Advance.EquipAdvanceGuard')
 
 local EquipSlotAttrApplier = {}
 
@@ -30,7 +31,7 @@ local AppliedAffixCache = {}
 local AffixFingerprintCache = {}
 -- 已绑定委托的 Pawn 记录
 local BoundPawns = {}
--- 装备快照缓存：PlayerPawn -> SlotIdx -> TypeSpecificID（用于检测装备变化，服务端委托不可靠时的兜底）
+-- 装备快照缓存包含原生实例标识与阶位，同 ItemID 不同实例也触发刷新。
 local EquipSnapshotCache = {}
 -- 装备轮询定时器：PlayerPawn -> TimerHandle
 local EquipPollTimers = {}
@@ -261,9 +262,14 @@ function EquipSlotAttrApplier.BindPlayer(PlayerPawn)
                     ID = DefineID
                 end
                 ID = ID or 0
+                local Snapshot = tostring(ID)
+                if ID ~= 0 then
+                    Snapshot = (EquipAdvanceGuard.Key(DefineID) or Snapshot) .. ':'
+                        .. tostring(EquipSlotSystem.GetEquipRankOrder(DefineID))
+                end
                 local Changed = false
-                if EquipSnapshotCache[PlayerPawn][SlotIdx] ~= ID then
-                    EquipSnapshotCache[PlayerPawn][SlotIdx] = ID
+                if EquipSnapshotCache[PlayerPawn][SlotIdx] ~= Snapshot then
+                    EquipSnapshotCache[PlayerPawn][SlotIdx] = Snapshot
                     Changed = true
                 end
                 -- 已穿戴下 CustomData.ExtraAffixes 变化时 DefineID 不变，靠指纹触发

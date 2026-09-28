@@ -33,6 +33,20 @@ function UGCGM:Register(DebugUI)
             {UGCGMUI.ItemTypeEnum.Button, {{"一键添加4件测试装备"}, {"依次添加 8310017/8310016/8310015/8310014 并自动穿上，便于一次覆盖多个槽位"}}, "C_AddAllTestEquips"},
             {UGCGMUI.ItemTypeEnum.Button, {{"添加测试金币"}, {"DS 添加 100000 金币，便于点强化"}}, "C_AddTestGold"},
         },
+        ["装备升阶"] = {
+            {UGCGMUI.ItemTypeEnum.Button, {{"一键添加升阶货币"}, {"每次添加100000金币和1000钻石，可重复点击"}}, "C_AdvanceQuickMoney"},
+            {UGCGMUI.ItemTypeEnum.Button, {{"一键添加升阶装备"}, {"每条已有升阶配方各添加一组目标和材料（当前57件）；不自动穿戴，背包满时停止"}}, "C_AdvanceQuickEquipment"},
+            {UGCGMUI.ItemTypeEnum.Button, {{"全部测试槽位强化至180"}, {"设置6个槽位的运行时强化等级，不主动写强化存档"}}, "C_AdvanceQuickLevels"},
+            {UGCGMUI.ItemTypeEnum.Button, {{"自动合成一次（确认消耗材料）"}, {"每点击一次合成一组；按阶位从低到高选择背包装备，含历史投入；跳过穿戴及保护物品"}}, "C_AdvanceQuickOnce"},
+            {UGCGMUI.ItemTypeEnum.Button, {{"列出装备实例"}, {"日志显示实例Key、独立阶位、下一阶ID、穿戴状态"}}, "C_AdvanceList"},
+            {UGCGMUI.ItemTypeEnum.TextInput, {{"添加升阶测试物品", "ItemID 数量"}, {"例：8310131 2；8310084 10000；8310132 100。装备不会自动穿戴"}}, "C_AdvanceAdd"},
+            {UGCGMUI.ItemTypeEnum.TextInput, {{"设置测试强化等级", "槽位1-6 等级0-180"}, {"例：3 60；仅本次运行时修改，不主动写强化存档"}}, "C_AdvanceLevel"},
+            {UGCGMUI.ItemTypeEnum.TextInput, {{"预览升阶", "目标Key 材料Key..."}, {"Key从实例列表复制；白绿蓝可省略材料；紫及以上必须手选"}}, "C_AdvancePreview"},
+            {UGCGMUI.ItemTypeEnum.TextInput, {{"确认上次升阶预览", "输入 YES"}, {"检查预览消耗后输入YES执行；将销毁目标和材料并生成下一阶"}}, "C_AdvanceConfirm"},
+            {UGCGMUI.ItemTypeEnum.TextInput, {{"设置装备保护", "Key Locked/Tracked/Reserved/InTrade/Viewed true/false"}, {"例：实例Key Locked true"}}, "C_AdvanceProtect"},
+            {UGCGMUI.ItemTypeEnum.Button, {{"升阶配置自检"}, {"检查独立阶位、下一阶配置、资产和缺失路线"}}, "C_AdvanceCheck"},
+            {UGCGMUI.ItemTypeEnum.Button, {{"检查升阶恢复状态"}, {"只读输出补偿失败的阻断与恢复记录"}}, "C_AdvanceRecovery"},
+        },
     }
 
     CurFuncList["怪物测试"] = {
@@ -42,6 +56,35 @@ function UGCGM:Register(DebugUI)
     }
 
     return CurFuncList
+end
+
+local function AdvanceArgs(text)
+    local out={}
+    for word in tostring(text or ''):gmatch('[^%s,，]+') do out[#out+1]=word end
+    return out
+end
+local function AdvanceClient() return require('Script.Blueprint.Prefabs.UI.Equip.Advance.EquipAdvanceClient') end
+function UGCGM:C_AdvanceQuickMoney() AdvanceClient().Quick('money') end
+function UGCGM:C_AdvanceQuickEquipment() AdvanceClient().Quick('equipment') end
+function UGCGM:C_AdvanceQuickLevels() AdvanceClient().Quick('levels') end
+function UGCGM:C_AdvanceQuickOnce() AdvanceClient().Quick('advance') end
+function UGCGM:C_AdvanceList() AdvanceClient().GM('list') end
+function UGCGM:C_AdvanceCheck() AdvanceClient().GM('check') end
+function UGCGM:C_AdvanceRecovery() AdvanceClient().GM('recovery') end
+function UGCGM:C_AdvanceAdd(text) AdvanceClient().GM('add',AdvanceArgs(text)) end
+function UGCGM:C_AdvanceLevel(text) AdvanceClient().GM('level',AdvanceArgs(text)) end
+function UGCGM:C_AdvanceProtect(text)
+    local a=AdvanceArgs(text)
+    if a[3]~='true' and a[3]~='false' then print('[EquipAdvance] 保护值须为true/false'); return end
+    a[3]=a[3]=='true'; AdvanceClient().GM('protect',a)
+end
+function UGCGM:C_AdvancePreview(text)
+    local a=AdvanceArgs(text); local target=table.remove(a,1)
+    AdvanceClient().Preview(target,#a>0 and a or nil)
+end
+function UGCGM:C_AdvanceConfirm(text)
+    if tostring(text or ''):match('^%s*(.-)%s*$')~='YES' then print('[EquipAdvance] 确认请输入YES'); return end
+    AdvanceClient().Confirm(true)
 end
 
 --- GM命令：一键召唤超级怪物到玩家身边

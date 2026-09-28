@@ -1,0 +1,66 @@
+Equipment advancement verification 2026-09-24
+PIE DebugID: _dkfffpn8mymuef; one client with DS
+Pure Lua: python Tests/run_equipment_tests.py -> 18 tests passed
+Lua 5.1 loadstring syntax -> 14 files passed; test modules inert on import
+DS source: 
+E:/WeGameApps/rail_apps/OasisEraEditor(2001776)/ShadowTrackerExtra/Saved/Logs/TTS/DSlog/FullLog/2026.09.24-16.00.04_ds__dkfffpn8mymuef_realtime.log
+Client source: 
+E:/WeGameApps/rail_apps/OasisEraEditor(2001776)/ShadowTrackerExtra/Saved/Logs/TTS/Clientlog/LuaLog/2026.09.24-15.58.37_client__dkfffpn8mymuef_1.log
+Selected native log lines (timestamps copied verbatim):
+[2026.09.24-16.08.43:455][15844][  9]LogNula: LuaLog: [AdvancePIE] currency 8310084 ShouldPersist=true
+[2026.09.24-16.08.43:455][15844][  9]LogNula: LuaLog: [AdvancePIE] currency 8310132 ShouldPersist=true
+[2026.09.24-16.12.11:993][22086][  9]LogNula: LuaLog: [AdvancePIE] FINAL SOURCE refresh complete
+[2026.09.24-16.12.12:005][22086][  9]LogNula: LuaLog: [AdvancePIE] PASS level gate has zero debit
+[2026.09.24-16.12.12:014][22086][  9]LogNula: LuaLog: [AdvancePIE] PASS white to green in bag and request replay
+[2026.09.24-16.12.12:032][22086][  9]LogNula: LuaLog: [AdvancePIE] PASS green to blue and missing purple asset
+[2026.09.24-16.12.12:068][22086][  9]LogNula: LuaLog: [AdvancePIE] purple new=831:8310123:128 rank=6 BaseAttack=230.0
+[2026.09.24-16.12.12:068][22086][  9]LogNula: LuaLog: [AdvancePIE] PASS worn purple plus one, manual confirmation, two same ID materials
+[2026.09.24-16.12.12:088][22086][  9]LogNula: LuaLog: [AdvancePIE] PASS real backpack compensation after injected creation failure
+[2026.09.24-16.12.12:124][22086][  9]LogNula: LuaLog: [AdvancePIE] PASS native equip succeeds then reports failure: restore original worn item
+[2026.09.24-16.12.12:139][22086][  9]LogNula: LuaLog: [AdvancePIE] RESULT passed=6 ok=true cleanup=true error=nil cleanupError=nil
+[2026.09.24-16.04.47:286][27816][29752]LogNula: LuaLog: [EquipAdvance] GM ConfigCheck OK=true
+[2026.09.24-16.04.47:295][27816][29752]LogNula: LuaLog: [EquipAdvance] Commit Advanced OK=true
+[2026.09.24-16.05.23:540][32135][29752]LogNula: LuaLog: [AdvanceRPCProbe] CLIENT PASS new item, inherited data, ledger, old target removal
+[2026.09.24-16.05.30:305][10067][  9]LogNula: LuaLog: [AdvanceRPCProbe] DS cleanup=true removed=1 money and level restored
+Boundaries: full backpack fault paths were tested in Lua adapter; multi-client, reconnect, cross-match persistence and process-crash atomicity not verified.
+
+Quick GM additions verified 2026-09-24
+Pure Lua 5.1: 23 groups passed
+DS source: E:/WeGameApps/rail_apps/OasisEraEditor(2001776)/ShadowTrackerExtra/Saved/Logs/TTS/DSlog/FullLog/2026.09.24-16.29.38_ds__dkfffpn8myp59k_realtime.log
+Client source: E:/WeGameApps/rail_apps/OasisEraEditor(2001776)/ShadowTrackerExtra/Saved/Logs/TTS/Clientlog/FullLog/2026.09.24-16.28.08_client__dkfffpn8myp59k_1.log
+[2026.09.24-16.30.34:905][2149][ 14]LogNula: LuaLog: [AdvanceGMPIE] PASS repeated money, 57 items, six levels, one merge per click, exhausted; merges=27 remaining=27
+[2026.09.24-16.30.34:971][2149][ 14]LogNula: LuaLog: [AdvanceGMPIE] RESULT ok=true cleanup=true error=nil cleanupError=nil
+[2026.09.24-16.31.47:152][4299][ 14]LogNula: LuaLog: [AdvanceQuickRPC] RESULT four actions=true cleanup=true error=nil
+[2026.09.24-16.30.57:230][1893][2216]LogNula: LuaLog: [EquipAdvance] GM GMQuickMoneyAdded OK=true
+[2026.09.24-16.30.57:436][1917][2216]LogNula: LuaLog: [EquipAdvance] GM GMQuickEquipmentAdded OK=true
+[2026.09.24-16.30.57:437][1917][2216]LogNula: LuaLog: [EquipAdvance] GM GMQuickLevelsSet OK=true
+[2026.09.24-16.30.57:445][1918][2216]LogNula: LuaLog: [EquipAdvance] GM Advanced OK=true
+
+DataTable migration verified 2026-09-24
+Native assets: EquipAdvanceRank + RankRow, Rule + RuleRow, Item + ItemRow (all under Asset/Data/Table/Customized)
+Counts: 12 / 11 / 39; saved editor JSON readback compared to Tests/Fixtures/EquipAdvanceTables.json field by field
+Lua 5.1: 17 config groups + 23 business groups passed; normalized fields match snapshot
+No Lua filesystem/process/dynamic-source calls in changed equipment Lua modules or tests
+Baseline session _dkfffpn8myt94w:
+[2026.09.24-17.30.17:941][4797][ 19]LogNula: LuaLog: [AdvanceTablePIE] PASS white preview and debit=100
+[2026.09.24-17.30.17:964][4797][ 19]LogNula: LuaLog: [AdvanceTablePIE] PASS 8310102 -> 8310101 materials=2 level=60 gold=650 diamond=1
+[2026.09.24-17.30.17:969][4797][ 19]LogNula: LuaLog: [AdvanceTablePIE] PASS missing next stage has zero debit; all 39 assets valid
+[2026.09.24-17.30.17:979][4797][ 19]LogNula: LuaLog: [AdvanceTablePIE] RESULT cost=100 ok=true cleanup=true error=nil cleanupError=nil
+[2026.09.24-17.30.19:350][4797][ 19]LogNula: LuaLog: [AdvanceGMPIE] PASS repeated money, 57 items, six levels, one merge per click, exhausted; merges=27 remaining=27
+[2026.09.24-17.30.19:395][4797][ 19]LogNula: LuaLog: [AdvanceGMPIE] RESULT ok=true cleanup=true error=nil cleanupError=nil
+Fresh startup session _dkfffpn8mytltl, saved R01_WHITE.Gold=137; no config code injection:
+[2026.09.24-17.33.30:208][1305][13556]LogNula: LuaLog: [AdvanceTable] FRESH CLIENT ranks=12 rules=11 items=39 errors=0 gold=137
+[2026.09.24-17.33.30:287][1313][13556]LogNula: LuaLog: [EquipAdvance] GM ConfigCheck OK=true
+[2026.09.24-17.33.37:430][2563][  9]LogNula: LuaLog: [AdvanceTablePIE] PASS white preview and debit=137
+[2026.09.24-17.33.37:450][2563][  9]LogNula: LuaLog: [AdvanceTablePIE] PASS 8310102 -> 8310101 materials=2 level=60 gold=650 diamond=1
+[2026.09.24-17.33.37:454][2563][  9]LogNula: LuaLog: [AdvanceTablePIE] PASS missing next stage has zero debit; all 39 assets valid
+[2026.09.24-17.33.37:460][2563][  9]LogNula: LuaLog: [AdvanceTablePIE] RESULT cost=137 ok=true cleanup=true error=nil cleanupError=nil
+[2026.09.24-17.27.02:592][292428][21480]LogUGCPIEFlowLog: PIE debug: lua file validation passed
+[2026.09.24-17.31.40:137][293481][21480]LogUGCPIEFlowLog: PIE debug: lua file validation passed
+After acceptance: PIE stopped; R01_WHITE.Gold restored to 100 and saved; all 62 native rows re-compared equal to the original snapshot. Total direct costs remain Gold=10000 Diamond=23.
+
+Maintenance documentation and reusable skill completed 2026-09-24
+Added Docs/equipment-advance-maintenance.md; corrected native Tests loading instructions in system guide.
+Skill source: Docs/skills/tts-equipment-maintenance; installed identical 4 files to C:/Users/Kvn/.codex/skills/tts-equipment-maintenance.
+Validation: source and installed skill quick_validate passed; 5 Markdown files / 10 links checked; YAML metadata and Python snippets checked; 3 native test literal dispatches compiled in Lua 5.1 without execution.
+Fixture baseline checked: 12/11/39 rows, direct total Gold=10000 Diamond=23. No new PIE/DS run for this documentation-only update.
