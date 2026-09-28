@@ -1,6 +1,6 @@
 # TTS 装备升阶维护手册
 
-维护基线：2026-09-24。本文用于后续改表、补装备路线、调整 GM、接入 UI、排查事务和 LuaCheck 问题。实际修改前应读取当前代码与保存的 UE 表，本文中的行数、费用和验证结果属于此日期的基线。
+维护基线：2026-09-28（配置与事务基线保持2026-09-24）。本文用于后续改表、补装备路线、调整 GM/UI、排查事务和 LuaCheck 问题。实际修改前应读取当前代码与保存的 UE 表，行数、费用和验证结果不是永久固定值。
 
 ## 1. 入口与资料分工
 
@@ -9,6 +9,7 @@
 | [系统说明](equipment-advance-system.md) | 完整规则、字段、39件装备路线、事务、GM操作及接口 |
 | 本手册 | 调整步骤、故障排查、测试方式与交接要求 |
 | [验证证据](equipment-advance-verification.txt) | 已执行测试的时间、会话、日志标记和验证边界 |
+| [升阶 UI 维护](equipment-advance-ui.md) | 玩家操作、控件绑定、请求状态机、生命周期、原生布局与交互测试 |
 | [维护 skill 源码](skills/tts-equipment-maintenance/SKILL.md) | 让 Codex 按本项目约束开展后续工作 |
 | [测试快照](../Tests/Fixtures/EquipAdvanceTables.json) | 三张 UE 表的迁移/回归基线，不参与游戏运行 |
 
@@ -41,7 +42,7 @@
 | 玩家侧自动选择/确认规则 | EquipAdvanceData、EquipAdvanceSystem | 是，不能照搬 GM 特例 |
 | 背包原生 API 或装备槽变化 | EquipAdvanceRuntime、原生背包/槽位接入 | 是 |
 | 自定义字段、投入账本、恢复逻辑 | EquipAdvanceData、EquipAdvanceSystem、Runtime | 是，需故障测试 |
-| 升阶 UI | EquipAdvanceClient + UIBP | 后续接入，不把事务放在 UI |
+| 升阶 UI | EquipAdvanceViewModel/UIRender/Client + Transform UIBP | 已接入，不把事务放在 UI |
 
 原生资产目录为 `/TTS/Asset/Data/Table/Customized`，磁盘对应 `Asset/Data/Table/Customized`。
 
@@ -143,7 +144,7 @@
 python Tests/run_equipment_tests.py
 ```
 
-依赖Python的 `lupa.lua51`。2026-09-24基线为17组配置测试+23组业务测试，以及逐字段快照比较。运行器在宿主Python读取文件，再执行Lua；项目Lua内不自行读文件。若Python环境不匹配，先确认当前Python和Lupa安装，不在游戏脚本中加入临时加载器。
+依赖Python的 `lupa.lua51`。2026-09-28基线为17组配置测试+23组业务测试+9组UI状态测试，以及逐字段快照比较。运行器在宿主Python读取文件，再执行Lua；项目Lua内不自行读文件。若Python环境不匹配，先确认当前Python和Lupa安装，不在游戏脚本中加入临时加载器。
 
 此测试验证规则和适配器故障处理，不能代替原生 userdata、真实背包、RPC或持久化验收。
 
@@ -211,17 +212,17 @@ DS通过之后，客户端执行GM自检和一次预览/确认，检查回调、
 4. 明确修复方案后按实际差额和缺失实例恢复，读回CustomData与穿戴、属性；同时核对内存和档案恢复阻断状态。当前没有自动清除记录的GM命令，具体修复代码应单独审查、测试。
 5. 保留处理证据。当前记录是异常参与者恢复记录，不是整个背包镜像，也没有跨存储原子性承诺。
 
-## 10. 后续 UI 接入
+## 10. 升阶 UI 维护
 
-通过 `EquipAdvanceClient.Preview(targetKey, materialKeys)` 和 `Confirm(true)` 使用现有RPC；`OnResult(result)` 接结果。展示服务端预览中的下一阶段、费用、材料实例和门槛，不在客户端另算配方或由客户端提交价格。
+已接入装备主界面的“养成 → 升阶”，PageId仍为transform。完整操作与代码定位见[升阶UI维护](equipment-advance-ui.md)。通过只读Snapshot刷新装备实例，再用PreviewForUI/CommitForUI和ClientRequestID匹配回复；价格与下一阶段由服务端决定。
 
-界面应明确紫阶以上材料确认、保护/历史投入提示、预览失效重做；成功/补偿后刷新所有实例引用。幂等重试必须沿用同一token和请求号。**现有Confirm每次调用都会生成新请求号，不是网络重试接口**；UI若需要重试，应扩展桥接层保存并重发原请求，不能连续调用Confirm冒充重试。提交期间避免重复点击，最终仍以服务端验证为准。
+紫阶以上手动选择相同ID材料并二次确认。110秒客户端预览过期会重做；提交8秒未回包可重试相同token/request。成功/补偿后刷新实例引用。旧Confirm仍供GM使用，每次生成新编号，不能用于网络重试。
 
-目前为单个 `OnResult` 回调，UI绑定/解绑需避免覆盖其他订阅者或销毁后遗留回调。UI完成后追加客户端生命周期、断线和多客户端验证，不把现有服务端测试当作UI验收。
+Client新增Subscribe/Unsubscribe多订阅接口并兼容旧OnResult。InitData绑定，Deactivate释放轮询/订阅，Destruct解绑委托；切页和Close均接入清理。实际单客户端鼠标交互与生命周期已验收，真实断线/丢包、多客户端和移动端仍是后续验证项。
 
 ## 11. Skill 安装、同步和交接
 
-可版本管理的源文件位于 `Docs/skills/tts-equipment-maintenance`。本机已安装到 `C:/Users/Kvn/.codex/skills/tts-equipment-maintenance`；其他机器复制到其 `$CODEX_HOME/skills`（未设置时为用户目录下 `.codex/skills`）。安装目录不属于项目Git，团队共享时应提交项目内源码。
+维护源码位于 `Docs/skills/tts-equipment-maintenance`，当前项目发现副本位于 `.codex/skills/tts-equipment-maintenance`，两处保持一致。当前不依赖用户全局技能目录；团队共享应保留项目内源码和发现副本。其他机器也可按其Codex配置安装到用户技能目录，但不要同时维护不同内容的同名副本。
 
 调用示例：`使用 $tts-equipment-maintenance，把紫+1升阶金币调整为700，并同步测试和验收记录。`
 

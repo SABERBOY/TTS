@@ -24,9 +24,12 @@ description: 维护 Oasis Era UGC 的 TTS 装备升阶模块。用于调整 Equi
 | 预览/幂等/执行/补偿 | Advance/EquipAdvanceSystem.lua |
 | 背包/货币/穿戴/档案适配 | Advance/EquipAdvanceRuntime.lua |
 | 快捷测试包/每点一次合成 | Advance/EquipAdvanceGM.lua + Script/utils/gm.lua |
-| UI/RPC | Advance/EquipAdvanceClient.lua、EquipAdvanceRPC.lua、UGCPlayerController.lua |
+| UI选择/确认/布局/生命周期 | Advance/EquipAdvanceViewModel.lua、EquipAdvanceUIRender.lua、UIBP/Game_Equip_Develop_Transform_UIBP.lua |
+| UI快照/RPC | Advance/EquipAdvanceClient.lua、EquipAdvanceRPC.lua、EquipAdvanceRuntime.lua、UGCPlayerController.lua |
 
 `Advance` 始终位于 `Script/Blueprint/Prefabs/UI/Equip`。按最小范围修改，保留原强化经济与装备蓝图技能。UE操作前读[原生表维护参考](references/ue-tables.md)；测试与LuaCheck读[验证参考](references/verification.md)。
+
+UI维护先读[升阶UI参考](references/ui.md)，完整人类交接文档为项目 `Docs/equipment-advance-ui.md`。玩家入口是养成→升阶，内部PageId仍为transform。
 
 ## 必须保留的约定
 
@@ -38,6 +41,7 @@ description: 维护 Oasis Era UGC 的 TTS 装备升阶模块。用于调整 Equi
 - 保留目标完整CustomData及保护、累计投入；检查512字节限制。普通自动选材排除历史投入且只用于低阶。GM快捷确认例外不应用到玩家自动流程。
 - Guard只限制事务生成实例自动穿戴；不改装备蓝图全局CDO。补偿后实例Key可能变化，使用RestoredKeys刷新。
 - RecoveryRequired保持阻断和记录；不能清记录假装修复。保存API成功不证明跨对局落盘，不声称跨进程原子性。
+- UI价格展示来自同一份表，但启用提交必须等待关联的服务端预览；紫阶及以上手动材料和二次确认。提交超时沿用原token/request，旧Confirm不是重试接口。
 
 ## 工作闭环
 
@@ -46,6 +50,6 @@ description: 维护 Oasis Era UGC 的 TTS 装备升阶模块。用于调整 Equi
 3. 同步测试快照和受影响期望，保留无关保护规则；解释新增路线对行数/GM包数的影响。
 4. 按改动运行离线回归、真实LuaCheck、相关PIE/DS用例；改表必须保存后重启，客户端和DS均核验。只改文档时检查链接、代码示例、skill结构，无需重启PIE。
 5. 检查业务结果与cleanup结果。将新证据追加到项目记录，说明未覆盖场景，不覆盖历史记录。
-6. 更新项目维护文档及本skill源码。项目源码为 `Docs/skills/tts-equipment-maintenance`；同步用户技能目录安装副本，并用skill-creator的quick_validate.py校验。无需写Codex记忆文件。
+6. 更新项目维护文档及本skill源码。项目源码为 `Docs/skills/tts-equipment-maintenance`；同步当前项目发现副本 `.codex/skills/tts-equipment-maintenance`，用skill-creator的quick_validate.py校验两处。不要创建内容不同的全局同名副本。无需写Codex记忆文件。
 
 报告具体改动、测试证据和剩余边界。继续完成已有授权的可逆维护，不为了套用流程增加无必要确认。

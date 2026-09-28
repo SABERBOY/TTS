@@ -131,6 +131,40 @@ function R.GetService(pc)
     return service
 end
 function R.Release(pc) R.Services[pc]=nil end
+-- Read-only player UI snapshot. No GM permission and no client-supplied prices.
+function R.UISnapshot(pc)
+    local s=R.GetService(pc); local a=s.A
+    local records=a:List(); local seen={}
+    for _,x in ipairs(records) do seen[x.Key]=true end
+    -- Show legacy wearable equipment too; it is explicitly unsupported for advancement.
+    for _,id in pairs(UGCBackpackSystemV2.GetAllItemDefineIDsV2(pc)) do
+        local key=G.Key(id)
+        if key and not seen[key] and UGCBackpackSystemV2.CheckCanEquipItemToAnySlotV2(pc,id.TypeSpecificID) then
+            records[#records+1]=a:Record(id); seen[key]=true
+        end
+    end
+    table.sort(records,function(x,y) return x.Key<y.Key end)
+    local result={OK=true,Code='Snapshot',Items={},Levels={},Blocked=s.Blocked==true,
+        GoldHave=a:Balance(C.GoldItemID),DiamondHave=a:Balance(C.DiamondItemID)}
+    for i=1,6 do result.Levels[i]=a:SlotLevel(i) end
+    local signatures={}
+    for _,x in ipairs(records) do
+        local cfg=C.Items[x.ItemID]; local state=x.CustomData.EquipAdvance
+        if type(state)~='table' then state={} end
+        local valid=D.ValidState(x.CustomData) and x.Count==1 and (x.CustomDataSize or 0)<=512
+        signatures[#signatures+1]={x.Key,x.ItemID,x.CustomData,x.Count,x.EquippedSlot,x.Attached,x.CustomDataSize}
+        result.Items[#result.Items+1]={Key=x.Key,ItemID=x.ItemID,EquippedSlot=x.EquippedSlot,
+            SlotIdx=cfg and cfg.SlotIdx or 0,RankOrder=cfg and cfg.RankOrder or 0,
+            AllowedMaterial=valid and not D.IsProtected(x) and true or false,
+            SafeAuto=valid and D.IsSafeAutoMaterial(x) and true or false,
+            Locked=state.Locked==true or x.CustomData.Locked==true,
+            HasInvestment=valid and ((state.Gold or 0)>0 or (state.Diamond or 0)>0 or (state.MaterialParts or 0)>0) or false}
+    end
+    local fingerprint=D.Fingerprint({signatures,result.Levels,result.GoldHave,result.DiamondHave,result.Blocked})
+    if fingerprint~=s.UIFingerprint then s.UIFingerprint=fingerprint; s.UIRevision=(s.UIRevision or 0)+1 end
+    result.Revision=s.UIRevision
+    return result
+end
 function R.IsGM(pc) return UGCGameSystem.IsServer() and UGCGameSystem.IsEnableGM(pc)==true end
 function R.Summary(pc)
     local service=R.GetService(pc); local result={}

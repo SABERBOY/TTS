@@ -30,7 +30,7 @@ local LEVEL1_TABS = {
 
 local LEVEL2_DEVELOP = {
     { Id = 'strengthen', Title = '强化', Page = PAGE_STRENGTHEN },
-    { Id = 'transform', Title = '转化', Page = PAGE_TRANSFORM },
+    { Id = 'transform', Title = '升阶', Page = PAGE_TRANSFORM },
 }
 
 local PAGE_WIDGET_NAME = {
@@ -42,7 +42,7 @@ local PAGE_WIDGET_NAME = {
 local PAGE_TITLE = {
     [PAGE_BASICS] = '装备',
     [PAGE_STRENGTHEN] = '强化',
-    [PAGE_TRANSFORM] = '转化',
+    [PAGE_TRANSFORM] = '升阶',
 }
 
 local LEVEL1_ITEM_CLASS = '/Game/UGC/UITemplate/Asset/Equip/UIBP/Item/UGC_Equip_Level1_Tabs_UIBP.UGC_Equip_Level1_Tabs_UIBP_C'
@@ -363,6 +363,8 @@ function Game_Equip_Main_UIBP:SyncTabIndexByPage(PageId)
 end
 
 function Game_Equip_Main_UIBP:SwitchToPage(PageId, Extra)
+    local Previous = self:GetVisibleChild()
+    if Previous and CheckObjectContainsField(Previous, 'Deactivate', true) then Previous:Deactivate() end
     Extra = Extra or {}
     PageId = PageId or PAGE_BASICS
     if not PAGE_WIDGET_NAME[PageId] then
@@ -454,6 +456,8 @@ function Game_Equip_Main_UIBP:InitData(InParams)
 end
 
 function Game_Equip_Main_UIBP:OnCloseClicked()
+    local Child = self:GetVisibleChild()
+    if Child and CheckObjectContainsField(Child, 'Deactivate', true) then Child:Deactivate() end
     print('[EquipMain] close')
     if self.InParams and self.InParams.CloseCallback then
         self.InParams.CloseCallback()

@@ -60,6 +60,8 @@ end
 function EquipPanelManager.Close()
     local Cached = EquipPanelManager.GetMainWidget()
     if Cached then
+        local Child = Cached:GetVisibleChild()
+        if Child and CheckObjectContainsField(Child, 'Deactivate', true) then Child:Deactivate() end
         UGCWidgetUtility.HideWidget(Cached)
         print('[EquipPanel] Close')
     end

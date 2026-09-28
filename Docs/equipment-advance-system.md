@@ -1,6 +1,6 @@
 # 装备升阶系统与 GM 验证
 
-更新：2026-09-24。实现范围为独立升阶逻辑、原生背包适配、实例数据继承、Controller RPC 和 GM。未修改 UIBP、装备蓝图属性/技能、掉落、商店或原槽位强化的消耗规则。
+更新：2026-09-28。实现范围为独立升阶逻辑、原生背包适配、实例数据继承、Controller RPC、GM，以及装备主界面“养成 → 升阶”UI。未修改装备蓝图属性/技能、掉落、商店或原槽位强化的消耗规则。UI操作、资产和维护细节见[升阶UI维护](equipment-advance-ui.md)。
 
 后续调整请从[维护手册](equipment-advance-maintenance.md)进入；可复用 Codex skill 的项目源码见[tts-equipment-maintenance](skills/tts-equipment-maintenance/SKILL.md)。
 
@@ -81,7 +81,8 @@ LuaCheck会在游戏世界尚未初始化时导入所有脚本。配置模块因
 | EquipAdvanceRuntime | 原生背包实例、CustomData、货币、穿戴、属性和 GM 服务 |
 | EquipAdvanceGuard | 仅对事务中新建实例限制自动穿戴 |
 | EquipAdvanceRPC | Controller薄转发和结果回复 |
-| EquipAdvanceClient | 客户端预览/确认桥接、结果日志，预留UI回调 |
+| EquipAdvanceClient | 客户端快照/预览/确认桥接、请求关联、多订阅回调与GM兼容 |
+| EquipAdvanceViewModel / EquipAdvanceUIRender | UI选择与确认状态机、图标/货币展示；不执行背包事务 |
 | EquipAdvanceGM | 批量货币/装备包、明确确认的一次合成选择与结果汇总 |
 
 原系统的必要接入：
@@ -169,7 +170,7 @@ local preview = s:Preview(targetKey, {materialKey1, materialKey2})
 local result = s:Execute(preview.Token, requestID, true)
 ```
 
-客户端应通过 `EquipAdvanceClient.Preview(targetKey, materialKeys)`、`Confirm(true)` 调用。可读取 `LastResult`、`LastPreview` 或设置 `OnResult(result)`。Controller只接受实例Key/预览token、请求号和确认状态，不接受客户端决定的消耗/下一阶ID。UI接入时应直接展示预览字段，并在失败/成功后刷新实例列表；自动重试应复用同一个请求号，不能重新生成请求号当作幂等重试。
+GM旧调用仍为 `EquipAdvanceClient.Preview(targetKey, materialKeys)`、`Confirm(true)`。玩家UI使用Snapshot、PreviewForUI、CommitForUI，Subscribe/Unsubscribe接收带ClientRequestID的结果。LastSnapshot单独存放，不覆盖GM用的LastResult。Controller只接受实例Key/预览token、请求号和确认状态，不接受客户端决定的消耗/下一阶ID。成功/失败后刷新实例列表，超时重试复用原token和请求号。
 
 成功预览含 TargetKey、ItemID、RankID/RankOrder/Major/Minor、NextItemID/NextRankID、SlotIdx、Level/RequiredLevel、MaterialKeys、Gold/Diamond、RequiresConfirmation、Token/Expires。失败返回OK=false和Code；强化不足附带Level和RequiredLevel。候选列表同ID，但Allowed/SafeAuto仅供选择提示，最终执行仍完整校验。
 
@@ -202,4 +203,4 @@ DataTable迁移验收（2026-09-24）：六个原生资产已保存，三张表�
 
 `Tests/EquipAdvanceTablePIE.lua` 提供显式 `Run(pc, expectedWhiteGold)` 测试。实测原值100金币的预览/扣款、8310102→8310101的2件材料/60级/650金币/1钻石，以及缺失下一阶零扣款全部通过；迁移后的整套快捷GM测试也通过。随后只改UE表内白阶Gold为137、保存并重新启动PIE，未经模块替换的客户端读取137、GM自检通过、DS预览及实际扣款137，测试资源清理成功。验收后停止PIE、恢复表内Gold=100并保存，三张表全部重新核对原值一致。
 
-证据摘要见 `Docs/equipment-advance-verification.txt`。真实DS未覆盖满背包故障（此项为纯Lua适配器测试）、多客户端并发、断线重连、原生跨对局恢复及进程崩溃时跨存储一致性；应作为后续验收项。属性验证检查了穿戴切换及重复刷新无叠加，未逐项遍历39件装备的每个技能效果。UIBP仍待后续接入。
+证据摘要见 `Docs/equipment-advance-verification.txt`。真实DS未覆盖满背包故障（此项为纯Lua适配器测试）、多客户端并发、断线重连、原生跨对局恢复及进程崩溃时跨存储一致性；应作为后续验收项。属性验证检查了穿戴切换及重复刷新无叠加，未逐项遍历39件装备的每个技能效果。2026-09-28新增UI交互验收和9组UI状态测试，边界详见UI维护文档。

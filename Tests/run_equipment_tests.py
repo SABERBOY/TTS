@@ -25,6 +25,7 @@ config_source = Path('Script/Blueprint/Prefabs/UI/Equip/Advance/EquipAdvanceConf
 lua.globals().EquipAdvanceReloadConfig = lambda: lua.execute(config_source)
 lua.execute(Path('Tests/EquipAdvanceConfigTests.lua').read_text(encoding='utf-8-sig')).Run()
 lua.execute(Path('Tests/EquipAdvanceTests.lua').read_text(encoding='utf-8-sig')).Run()
+lua.execute(Path('Tests/EquipAdvanceUITests.lua').read_text(encoding='utf-8-sig')).Run()
 config = lua.eval("require('Script.Blueprint.Prefabs.UI.Equip.Advance.EquipAdvanceConfig')")
 orders = {row['RankID']: row['Order'] for row in fixture['EquipAdvanceRank']}
 for row in fixture['EquipAdvanceRank']:

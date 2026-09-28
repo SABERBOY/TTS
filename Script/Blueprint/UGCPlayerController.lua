@@ -130,7 +130,7 @@ function UGCPlayerController:GetAvailableServerRPCs()
         "Client_OnMonsterWaveStart", "Server_OnHeroSelectionFinished", "ServerRPC_AddItemWithInstanceData",
         "ServerRPC_StrengthenEquipSlot", "ServerRPC_GMAddItem", "ServerRPC_NotifyEquipSlotChanged",
         "ServerRPC_GMSummonMonster", "ServerRPC_EquipAdvancePreview", "ServerRPC_EquipAdvanceCommit",
-        "ServerRPC_EquipAdvanceGM";
+        "ServerRPC_EquipAdvanceGM", "ServerRPC_EquipAdvanceSnapshot";
 end
 
 -- Existing GameMode calls the first two methods through UnrealNetwork.CallUnrealRPC.
@@ -140,9 +140,14 @@ function UGCPlayerController:GetAvailableClientRPCs()
 end
 
 -- Advancement owns validation/transactions. Controller only routes owned RPCs.
-function UGCPlayerController:ServerRPC_EquipAdvancePreview(TargetKey, MaterialKeys)
+function UGCPlayerController:ServerRPC_EquipAdvanceSnapshot(Context)
     if not self:HasAuthority() then return end
-    require('Script.Blueprint.Prefabs.UI.Equip.Advance.EquipAdvanceRPC').Preview(self, TargetKey, MaterialKeys)
+    require('Script.Blueprint.Prefabs.UI.Equip.Advance.EquipAdvanceRPC').Snapshot(self, Context)
+end
+
+function UGCPlayerController:ServerRPC_EquipAdvancePreview(TargetKey, MaterialKeys, Context)
+    if not self:HasAuthority() then return end
+    require('Script.Blueprint.Prefabs.UI.Equip.Advance.EquipAdvanceRPC').Preview(self, TargetKey, MaterialKeys, Context)
 end
 
 function UGCPlayerController:ServerRPC_EquipAdvanceCommit(Token, RequestID, Confirmed)

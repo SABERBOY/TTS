@@ -64,3 +64,44 @@ Added Docs/equipment-advance-maintenance.md; corrected native Tests loading inst
 Skill source: Docs/skills/tts-equipment-maintenance; installed identical 4 files to C:/Users/Kvn/.codex/skills/tts-equipment-maintenance.
 Validation: source and installed skill quick_validate passed; 5 Markdown files / 10 links checked; YAML metadata and Python snippets checked; 3 native test literal dispatches compiled in Lua 5.1 without execution.
 Fixture baseline checked: 12/11/39 rows, direct total Gold=10000 Diamond=23. No new PIE/DS run for this documentation-only update.
+
+Equipment advancement UI completed 2026-09-28
+Entry: equipment main -> 养成 -> 升阶; PageId=transform.
+Assets: existing Game_Equip_Develop_Transform_UIBP, new dedicated Game_Equip_Advance_Row_UIBP.
+No DataTable/equipment item asset/economy changes in this UI work.
+Offline final: 17 config + 23 business + 9 UI tests passed; all migrated configuration fields match snapshot.
+Lua syntax compiled for equipment scripts and all EquipAdvance tests. Restricted filesystem/process/dynamic-source call scan: no matches in advancement implementation/new UI/tests. Scan is supplementary, real LuaCheck below is authoritative for this run.
+
+Interactive session _dkfffpqqwz71ht
+Client log: ShadowTrackerExtra/Saved/Logs/TTS/Clientlog/FullLog/2026.09.28-11.35.57_client__dkfffpqqwz71ht_1.log
+11:40:56 Commit Advanced: physical white accessory click -> 8310130, new Key=831:8310130:92.
+11:40:57 Audit: white count=4, green count=1; GoldSpent=100 DiamondSpent=0; output selected, no further material, button disabled.
+11:47:31 First purple confirmation Audit: 8310102 count=3, cumulative GoldSpent=100 DiamondSpent=0 (no mutation).
+11:47:42 Commit Advanced after second physical click.
+11:47:55 Audit: 8310102 absent, 8310101 count=1, cumulative GoldSpent=750 DiamondSpent=1.
+11:48:11 UI state: 8310093 selected, Code=NextItemMissing, enabled=false.
+11:48:46 LEVEL_LOW_BUTTON_DISABLED passed.
+11:49:10 MONEY_LOW_BUTTON_DISABLED passed.
+11:49:25 LOCKED_MATERIALS_EXCLUDED passed.
+11:49:53 TAB_DEACTIVATE_OK passed (timer/subscription released); reopen requested.
+11:49:54 Cleanup OK=true Removed=11; exact fixture currencies/levels restored; no fixture items remain.
+11:50:05 REOPEN_AND_CLOSE_OK passed.
+Resolved during iteration: native assert does not return its input (fixture variable assignment fixed); a temporary debug assertion expected signed negative RemoveItem count, while adapter correctly returns positive removed count. Subsequent native balance/UI assertions and cleanup passed. These were test snippet errors, not suppressed production failures.
+
+Final fresh initialization session _dkfffpqqwz7son (all final source saved before startup)
+Client log: ShadowTrackerExtra/Saved/Logs/TTS/Clientlog/FullLog/2026.09.28-11.50.26_client__dkfffpqqwz7son_1.log
+[2026.09.28-11.51.12:722] LogUGCPIEFlowLog: PIE debug: lua file validation passed
+Fresh InitData + Snapshot + dynamic rows + separate model instance; no hot-reload required for final acceptance.
+Physical scroll -> purple+1 target -> two material clicks -> first confirmation -> second confirmation.
+Visual inspection: fonts, independent rank text, target/material icons, both currencies, status text and button do not overlap; prompt changes to confirmation, output selected after success.
+11:56:00 Audit first confirmation: GoldSpent=0 DiamondSpent=0, 8310102 count=3.
+11:56:09 Commit Advanced OK=true.
+11:56:28 FRESH_SUCCESS_AND_REOPEN passed; output ItemID=8310101, NoticeOK=true, next button disabled.
+11:56:28 Audit: GoldSpent=650 DiamondSpent=1, 8310101 count=1, 8310102 absent.
+11:56:28 Cleanup OK=true Removed=12; exact currencies and six slot levels restored.
+FRESH_EMPTY_AND_CLOSE_OK passed: empty snapshot after cleanup; cached panel reopened correctly; close removed timer/subscription.
+No DoString Error or runtime UI callback error in final session client log. PIE stopped after cleanup.
+
+Documentation/skills: Docs/equipment-advance-ui.md added, system/maintenance updated; UI reference added to skill.
+Source Docs/skills/tts-equipment-maintenance and project discovery copy .codex/skills/tts-equipment-maintenance are byte-identical; both quick_validate checks passed. 18 relative Markdown links checked. Global same-name skill directory is not used by this project version.
+Remaining boundaries: real packet loss/reconnect, multi-client sessions, mobile touch/other resolutions, native crash/persistence remain unverified; offline tests cover stale replies/expiry/retry/rollback references. Existing server transaction tests are not presented as UI coverage for these missing scenarios.

@@ -1,26 +1,30 @@
 local R=require('Script.Blueprint.Prefabs.UI.Equip.Advance.EquipAdvanceRuntime')
 local C=require('Script.Blueprint.Prefabs.UI.Equip.Advance.EquipAdvanceConfig')
 local RPC={}
-local function reply(pc,kind,fn)
+local function reply(pc,kind,fn,context)
     local ok,result=pcall(fn)
     if not ok then
         print('[EquipAdvance] '..kind..' error: '..tostring(result))
         result={OK=false,Code='ServerError'}
     end
     result.Kind=kind
+    if type(context)=='string' and #context<=160 then result.ClientRequestID=context end
     UnrealNetwork.CallUnrealRPC(pc,pc,'Client_EquipAdvanceResult',result)
     return result
 end
-function RPC.Preview(pc,target,materials)
+function RPC.Snapshot(pc,context)
+    return reply(pc,'Snapshot',function() return R.UISnapshot(pc) end,context)
+end
+function RPC.Preview(pc,target,materials,context)
     return reply(pc,'Preview',function()
         local s=R.GetService(pc)
         local result=s:Preview(target,materials)
         if result.Code=='ManualMaterialsRequired' or result.OK then result.Candidates=s:Candidates(target) end
         return result
-    end)
+    end,context)
 end
 function RPC.Commit(pc,token,request,confirmed)
-    return reply(pc,'Commit',function() return R.GetService(pc):Execute(token,request,confirmed) end)
+    return reply(pc,'Commit',function() return R.GetService(pc):Execute(token,request,confirmed) end,request)
 end
 function RPC.GM(pc,action,args)
     return reply(pc,'GM',function()
