@@ -9,7 +9,7 @@ function T.Run(pc)
     local a=s.A; local p=pc:GetPlayerCharacterSafety(); assert(p,'pawn required')
     local list=a.List; local original={}; local levels={}
     for _,x in ipairs(a:List()) do original[x.Key]=true end
-    local gold,diamond=a:Balance(8310084),a:Balance(8310132)
+    local gold,diamond=a:Balance(1001),a:Balance(1002)
     for slot=1,6 do levels[slot]=Slots.GetSlotLevel(nil,slot,p) end
     a.List=function(self)
         local out={}
@@ -19,7 +19,7 @@ function T.Run(pc)
     local merged=0; local tag='quick-pie:'..os.time()
     local ok,err=pcall(function()
         assert(R.GMQuick(pc,'money').OK and R.GMQuick(pc,'money').OK,'money add')
-        assert(a:Balance(8310084)==gold+200000 and a:Balance(8310132)==diamond+2000,'repeat money')
+        assert(a:Balance(1001)==gold+200000 and a:Balance(1002)==diamond+2000,'repeat money')
         local pack=R.GMQuick(pc,'equipment')
         assert(pack.OK and pack.Added==57,'pack '..tostring(pack.Code)..':'..tostring(pack.Added))
         for _,x in ipairs(a:List()) do assert(x.EquippedSlot=='','unexpected auto-equip') end
@@ -46,7 +46,7 @@ function T.Run(pc)
             assert(a:Remove(x)==1,'cleanup item')
         end
         for slot=1,6 do Slots.SetSlotLevel(p,slot,levels[slot]) end
-        for id,value in pairs({[8310084]=gold,[8310132]=diamond}) do
+        for id,value in pairs({[1001]=gold,[1002]=diamond}) do
             local delta=value-a:Balance(id)
             if delta~=0 then assert(a:ChangeCurrency(id,delta)==math.abs(delta),'cleanup money') end
         end

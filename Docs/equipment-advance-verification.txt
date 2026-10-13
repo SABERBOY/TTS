@@ -105,3 +105,56 @@ No DoString Error or runtime UI callback error in final session client log. PIE 
 Documentation/skills: Docs/equipment-advance-ui.md added, system/maintenance updated; UI reference added to skill.
 Source Docs/skills/tts-equipment-maintenance and project discovery copy .codex/skills/tts-equipment-maintenance are byte-identical; both quick_validate checks passed. 18 relative Markdown links checked. Global same-name skill directory is not used by this project version.
 Remaining boundaries: real packet loss/reconnect, multi-client sessions, mobile touch/other resolutions, native crash/persistence remain unverified; offline tests cover stale replies/expiry/retry/rollback references. Existing server transaction tests are not presented as UI coverage for these missing scenarios.
+
+
+2026-09-30 VirtualItemManager equipment currency migration
+Runtime authority: saved /TTS/Asset/Data/Table/UGCObject.UGCObject, ItemID 1001/1002.
+Official reference: OpenWorld/ExtendResource/Activity/OfficialPackage/Script/Activity/ActivityManager.lua.
+GameMode native ActiveGameParts: [] -> [VirtualItemManager], no EditCondition.
+GameMode saved/compiled and read back; final native PRV plan plan_16864882_6572ec95 passed with no warnings.
+Preserved pre-existing UGCBattleItem, UGCWeaponAttachment, UGCObject and project edits.
+Currency gateway reads official GetItemNum/GetItemData, AddVirtualItem/RemoveItem callback.
+Real equipment still uses native instance backpack/CustomData/equip; original strengthening price curve and nil PartsItemID retained.
+No Lua file/process/dynamic source APIs added to equipment runtime or equipment tests.
+
+Offline: python -X utf8 Tests/run_equipment_tests.py
+64 groups passed: 17 config, 27 advance (original 23 + 4 deferred callback cases), 9 UI, 6 virtual currency, 5 strengthen transactions.
+Includes deferred two-currency debit, waiting same request replay, duplicate callbacks, second currency failure, deferred refund, unrecoverable refund blocking, native-rejected addition and callback error isolation.
+Every original migrated configuration field still matches Tests/Fixtures/EquipAdvanceTables.json.
+
+Initial active manager session _dkfffpsi20lgov
+Client: ShadowTrackerExtra/Saved/Logs/TTS/Clientlog/FullLog/2026.09.30-11.14.45_client__dkfffpsi20lgov_1.log
+DS: ShadowTrackerExtra/Saved/Logs/TTS/DSlog/FullLog/2026.09.30-11.16.25_ds__dkfffpsi20lgov_realtime.log
+11:15:34.039 editor: PIE debug: lua file validation passed.
+11:17:02 client: VirtualItemManager loaded, UGCObject read, no UGCObjectMapping, bTableDataReady=true.
+11:21:01 DS: AddVirtualItem 100, GetItemNum 100, RemoveItem callback restored 0.
+11:26:03-04 EquipCurrencyPIE: 10 groups passed. completed=10 success=true cleanup=true gold=0 diamond=0.
+Native: 8310102 -> 8310101, two materials, slot4 level60, cost650/1; worn target preserved; no attribute stacking; creation failure refunded; missing route/low level zero debit.
+Native strengthening1->2 cost36 from original table; setter failure refunded and restored level.
+57-item GM pack merged27 times, remaining27; tagged equipment selection/cleanup preserved unrelated inventory.
+11:29-32 client GM money RPC: 100000/1000; UI delegate=true. Preview/commit real white -> green, UI99900/1000, native8310130 ledger100 and marker inherited. Close/reopen delegated successfully.
+Initial client cleanup command assigned assert(state) return to state and failed with nil state; this was a test command error, not service failure. Tagged output was removed before that error. No cleanup success was claimed for this attempt.
+
+Fresh final implementation session _dkfffpsi20mcou
+Client: ShadowTrackerExtra/Saved/Logs/TTS/Clientlog/FullLog/2026.09.30-11.33.03_client__dkfffpsi20mcou_1.log
+DS: ShadowTrackerExtra/Saved/Logs/TTS/DSlog/FullLog/2026.09.30-11.34.40_ds__dkfffpsi20mcou_realtime.log
+11:33:51.457 editor: PIE debug: lua file validation passed.
+11:43:08-09 all10 callback acceptance groups passed again. completed=10 success=true cleanup=true gold=0 diamond=0.
+11:45:31 client final RPC: item8310130, cost100 virtual gold.
+11:47:10 client: UI900/10, native8310130 ledger100; close removed currency delegate.
+11:47:18.454 DS: explicit state then assertion; cleanup=true removed=1 gold=0 diamond=0; original test slot restored.
+11:48:25.371 client: cleanup client balances=0,0.
+
+Last saved-code initialization session _dkfffpsi20n1lw
+Client: ShadowTrackerExtra/Saved/Logs/TTS/Clientlog/FullLog/2026.09.30-11.49.43_client__dkfffpsi20n1lw_1.log
+DS: ShadowTrackerExtra/Saved/Logs/TTS/DSlog/FullLog/2026.09.30-11.51.38_ds__dkfffpsi20n1lw_realtime.log
+11:50:43.380 editor: PIE debug: lua file validation passed after final GM native-return checks and all saved tests.
+
+Documentation: equipment-virtual-currency.md added; system/maintenance/UI references updated. Source and project skill copies are byte-identical and both quick_validate passed; 28 relative document links exist. Opened new document in Codex (queued).
+Boundaries: real cloud persistence/latency, multi-client/reconnect, other direct currency writers, process-crash cross-storage atomicity are not proven. No old8310084/8310132 balance exchange or recovery payout migration performed. Historical ledger amounts preserved; future recycling needs explicit currency-version design.
+
+Final session readback:
+11:56:51.918 client [VirtualLast]: loaded=true gold=0 diamond=0.
+11:57:00.985 DS [VirtualLast]: GM native return check OK=true added=100000,1000.
+11:57:00.987 DS [VirtualLast]: cleanup=true gold=0 diamond=0.
+Final session was stopped after explicit cleanup readback. Git diff whitespace checks passed for modified code/docs/tests.

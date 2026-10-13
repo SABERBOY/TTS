@@ -60,6 +60,7 @@ end
 function EquipPanelManager.Close()
     local Cached = EquipPanelManager.GetMainWidget()
     if Cached then
+        if CheckObjectContainsField(Cached,'UnbindCurrencies',true) then Cached:UnbindCurrencies() end
         local Child = Cached:GetVisibleChild()
         if Child and CheckObjectContainsField(Child, 'Deactivate', true) then Child:Deactivate() end
         UGCWidgetUtility.HideWidget(Cached)

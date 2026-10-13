@@ -11,7 +11,7 @@ function T.Run(pc,expectedWhiteGold)
     local report=C.Validate(function(id) return a:AssetReady(id) end)
     assert(#C.Ranks==12 and #C.Rules==11 and #C.ItemRows==39 and #report.Errors==0,'table contract')
     assert(#report.Missing==12 and C.Rules[1].Gold==expectedWhiteGold,'table value')
-    local gold,diamond=a:Balance(8310084),a:Balance(8310132)
+    local gold,diamond=a:Balance(1001),a:Balance(1002)
     local lv3,lv4=Slots.GetSlotLevel(nil,3,p),Slots.GetSlotLevel(nil,4,p)
     local tag='TableProbe:'..os.time()
     local function seed(id,n)
@@ -26,29 +26,29 @@ function T.Run(pc,expectedWhiteGold)
         a:Finish(); assert(ok,err); return keys
     end
     local ok,err=pcall(function()
-        assert(a:ChangeCurrency(8310084,10000)==10000 and a:ChangeCurrency(8310132,100)==100)
+        assert(a:ChangeCurrency(1001,10000)==10000 and a:ChangeCurrency(1002,100)==100)
         Slots.SetSlotLevel(p,3,10); Slots.SetSlotLevel(p,4,60)
         local white=seed(8310131,2)
         local preview=s:Preview(white[1],{white[2]})
         assert(preview.OK and preview.Gold==expectedWhiteGold,'white preview')
-        local before=a:Balance(8310084)
+        local before=a:Balance(1001)
         local result=s:Execute(preview.Token,tag..':white',true)
         assert(result.OK and result.NewItemID==8310130,'white commit')
-        assert(a:Balance(8310084)==before-expectedWhiteGold,'actual table cost')
+        assert(a:Balance(1001)==before-expectedWhiteGold,'actual table cost')
         print('[AdvanceTablePIE] PASS white preview and debit='..expectedWhiteGold)
         local gloves=seed(8310102,3)
         preview=s:Preview(gloves[1],{gloves[2],gloves[3]})
         assert(preview.OK and preview.NextItemID==8310101 and preview.RequiredLevel==60
             and preview.Gold==650 and preview.Diamond==1 and #preview.MaterialKeys==2,'glove preview')
-        before=a:Balance(8310084); local beforeDiamond=a:Balance(8310132)
+        before=a:Balance(1001); local beforeDiamond=a:Balance(1002)
         result=s:Execute(preview.Token,tag..':glove',true)
-        assert(result.OK and result.NewItemID==8310101 and a:Balance(8310084)==before-650
-            and a:Balance(8310132)==beforeDiamond-1,'glove commit')
+        assert(result.OK and result.NewItemID==8310101 and a:Balance(1001)==before-650
+            and a:Balance(1002)==beforeDiamond-1,'glove commit')
         print('[AdvanceTablePIE] PASS 8310102 -> 8310101 materials=2 level=60 gold=650 diamond=1')
         local terminal=seed(8310129,1)[1]
-        before=a:Balance(8310084); beforeDiamond=a:Balance(8310132)
+        before=a:Balance(1001); beforeDiamond=a:Balance(1002)
         assert(s:Preview(terminal,{}).Code=='NextItemMissing','missing route')
-        assert(a:Balance(8310084)==before and a:Balance(8310132)==beforeDiamond,'missing route no debit')
+        assert(a:Balance(1001)==before and a:Balance(1002)==beforeDiamond,'missing route no debit')
         print('[AdvanceTablePIE] PASS missing next stage has zero debit; all 39 assets valid')
     end)
     local clean,cleanError=pcall(function()
@@ -58,7 +58,7 @@ function T.Run(pc,expectedWhiteGold)
             end
         end
         Slots.SetSlotLevel(p,3,lv3); Slots.SetSlotLevel(p,4,lv4)
-        for id,value in pairs({[8310084]=gold,[8310132]=diamond}) do
+        for id,value in pairs({[1001]=gold,[1002]=diamond}) do
             local delta=value-a:Balance(id)
             if delta~=0 then assert(a:ChangeCurrency(id,delta)==math.abs(delta),'cleanup currency') end
         end

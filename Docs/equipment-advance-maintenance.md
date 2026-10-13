@@ -1,6 +1,6 @@
 # TTS 装备升阶维护手册
 
-维护基线：2026-09-28（配置与事务基线保持2026-09-24）。本文用于后续改表、补装备路线、调整 GM/UI、排查事务和 LuaCheck 问题。实际修改前应读取当前代码与保存的 UE 表，行数、费用和验证结果不是永久固定值。
+维护基线：2026-09-30（VirtualItemManager货币；原配置与费用曲线保持）。本文用于后续改表、补装备路线、调整 GM/UI、排查事务和 LuaCheck 问题。实际修改前应读取当前代码与保存的 UE 表，行数、费用和验证结果不是永久固定值。
 
 ## 1. 入口与资料分工
 
@@ -9,6 +9,7 @@
 | [系统说明](equipment-advance-system.md) | 完整规则、字段、39件装备路线、事务、GM操作及接口 |
 | 本手册 | 调整步骤、故障排查、测试方式与交接要求 |
 | [验证证据](equipment-advance-verification.txt) | 已执行测试的时间、会话、日志标记和验证边界 |
+| [虚拟货币维护](equipment-virtual-currency.md) | UGCObject、GamePart、强化/升阶异步扣款、UI/GM及恢复阻断 |
 | [升阶 UI 维护](equipment-advance-ui.md) | 玩家操作、控件绑定、请求状态机、生命周期、原生布局与交互测试 |
 | [维护 skill 源码](skills/tts-equipment-maintenance/SKILL.md) | 让 Codex 按本项目约束开展后续工作 |
 | [测试快照](../Tests/Fixtures/EquipAdvanceTables.json) | 三张 UE 表的迁移/回归基线，不参与游戏运行 |
@@ -22,7 +23,7 @@
 - 升阶模块位于 `Script/Blueprint/Prefabs/UI/Equip/Advance`，不恢复旧的 `Script/Equipment` 目录。
 - 相同 ItemID 的不同实例才能合并。系列、原生品质、显示名称相同均不足以作为材料条件。
 - 六大阶、十二阶段、强化最高180是现有代码契约。物品品质 ItemQuality 与装备 RankID 分开维护。
-- 材料数量不含目标。使用金币8310084、钻石8310132；不顺带修改原槽位强化经济。
+- 材料数量不含目标。使用UGCObject虚拟金币1001、钻石1002；不顺带修改原槽位强化费用曲线。
 - 保留装备蓝图配置的属性和技能；本系统生成下一阶段原生物品，不复制旧装备的蓝图配置替代新物品。
 - 游戏 Lua 及工程内 Lua 测试禁止引入文件读写、进程执行和动态源码加载，例如 `io.*`、`dofile`、`loadfile`、`loadstring`、`os.execute`、`package.loadlib`。不要用这些方法绕过 UGC 资源接口或调试装载限制。离线 Python 读取源码/快照与游戏 Lua 是不同执行环境。
 - `.uasset`、结构体、DataTable 由 UE 编辑器/原生编辑器工具维护，不能用外部二进制写入替代原生保存。
@@ -37,7 +38,7 @@
 | 增加某系列的下一阶段、增加新系列 | EquipAdvanceItem + 对应原生装备/UGCBattleItem | 通常否，需新增有效资产 |
 | 原生品质、装备属性、技能 | 原物品资产及对应配置 | 不在升阶表中修改 |
 | 阶段超过12或等级超过180 | Config + 原槽位系统 + 调用方 + 测试 | 是，另做整体设计 |
-| 更换货币 ItemID | EquipAdvanceConfig 及 GM/测试中引用 | 是，不能只改费用表 |
+| 更换货币 ItemID | EquipCurrency + UGCObject + GM/测试/账本迁移检查 | 是，不能只改费用表 |
 | 一键发放数量、自动合成选择顺序 | EquipAdvanceGM | 是 |
 | 玩家侧自动选择/确认规则 | EquipAdvanceData、EquipAdvanceSystem | 是，不能照搬 GM 特例 |
 | 背包原生 API 或装备槽变化 | EquipAdvanceRuntime、原生背包/槽位接入 | 是 |
@@ -144,7 +145,7 @@
 python Tests/run_equipment_tests.py
 ```
 
-依赖Python的 `lupa.lua51`。2026-09-28基线为17组配置测试+23组业务测试+9组UI状态测试，以及逐字段快照比较。运行器在宿主Python读取文件，再执行Lua；项目Lua内不自行读文件。若Python环境不匹配，先确认当前Python和Lupa安装，不在游戏脚本中加入临时加载器。
+依赖Python的 `lupa.lua51`。2026-09-30基线共64组：17组配置+27组业务（保留原23组）+9组UI状态+6组虚拟货币+5组强化事务，以及逐字段快照比较。运行器在宿主Python读取文件，再执行Lua；项目Lua内不自行读文件。若Python环境不匹配，先确认当前Python和Lupa安装，不在游戏脚本中加入临时加载器。
 
 此测试验证规则和适配器故障处理，不能代替原生 userdata、真实背包、RPC或持久化验收。
 
@@ -162,6 +163,7 @@ Tests目录也会被检查。Lua测试模块只返回对象，必须显式 `.Run
 
 | 源码 | 入口 | 覆盖 |
 |---|---|---|
+| Tests/EquipCurrencyPIE.lua | Run(pc) | 当前虚拟货币/升阶/强化/GM的10组回调验收与异步清理 |
 | Tests/EquipAdvancePIE.lua | Run(pc) | 6组原生成功、补偿、穿戴与刷新检查 |
 | Tests/EquipAdvanceGMPIE.lua | Run(pc) | 快捷货币/装备包/27次合成/幂等/清理 |
 | Tests/EquipAdvanceTablePIE.lua | Run(pc, expectedWhiteGold) | 表读取、实际费用、手套小阶、缺失下一阶零扣款 |
@@ -179,13 +181,15 @@ T.Run(UGCGameSystem.GetAllPlayerController()[1], 100)
 
 只用于已启用GM权限的隔离测试角色。运行前读测试源码，检查它对当前配置的固定假设；已有多个玩家时显式选定测试Controller，不盲目取第一个。工具参数通过当前 `ue_pie` 文档确定，不猜测工具签名。此方法不把配置模块替换为测试数据，仍读取保存的UE表。
 
-三份测试会操作真实原生资源，并尝试清理测试物品、恢复相应状态。必须同时检查业务成功和 `cleanup=true`；故障中断后先查测试标记与恢复记录再重跑。更详细的宿主组装步骤见 skill 的 [验证参考](skills/tts-equipment-maintenance/references/verification.md)。
+新虚拟货币验收入口等待每次回调；原三份同步测试仅适合即时回调环境，不作为异步完成证明。各测试会操作真实原生资源，并尝试清理测试物品、恢复相应状态。必须同时检查业务成功和 `cleanup=true`；故障中断后先查测试标记与恢复记录再重跑。更详细的宿主组装步骤见 skill 的 [验证参考](skills/tts-equipment-maintenance/references/verification.md)。
 
 ### 7.4 客户端/RPC与持续性
 
 DS通过之后，客户端执行GM自检和一次预览/确认，检查回调、原生背包新实例、旧实例消失及账本。配置调整需要在新启动客户端和DS分别确认读到新值。
 
 跨对局保存要单独以正常退出、重新进入、读取原生实例/CustomData验收；仅Save成功不能证明落盘。多客户端、断线重连和进程崩溃场景也不能从单客户端成功推断。记录具体日志、时间、会话和资源清理结果，向验证证据文件追加本轮结果，不改写旧证据。
+
+虚拟货币排错、账号恢复阻断、存量旧币边界见[虚拟货币维护](equipment-virtual-currency.md)。
 
 ## 8. 故障速查
 

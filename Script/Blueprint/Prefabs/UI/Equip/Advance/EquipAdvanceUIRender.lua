@@ -1,5 +1,6 @@
 -- Render the existing template widgets; never changes their shared blueprints.
 local C=require('Script.Blueprint.Prefabs.UI.Equip.Advance.EquipAdvanceConfig')
+local Currency=require('Script.Blueprint.Prefabs.UI.Equip.EquipCurrency')
 local U={}; local imageRequests=setmetatable({},{__mode='k'})
 function U.Visible(w,show,hit)
     if w then w:SetVisibility(show and (hit and ESlateVisibility.Visible or ESlateVisibility.SelfHitTestInvisible) or ESlateVisibility.Collapsed) end
@@ -56,6 +57,7 @@ function U.Currency(w,id,have,cost)
     U.Text(w.TextBlock_Currency_Amount,tostring(have or 0)..' / '..tostring(cost))
     w.TextBlock_Currency_Amount:SetColorAndOpacity({SpecifiedColor=have>=cost and
         {R=0.95,G=0.85,B=0.55,A=1} or {R=1,G=0.25,B=0.2,A=1},ColorUseRule=0})
-    U.Image(w.Image_Currency_Icon,UGCItemSystemV2.GetItemIconTextureV2(id))
+    local ready,data=pcall(Currency.GetData,id)
+    U.Image(w.Image_Currency_Icon,ready and data.ItemIcon or nil)
 end
 return U

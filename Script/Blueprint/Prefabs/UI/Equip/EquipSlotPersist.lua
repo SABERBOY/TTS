@@ -4,6 +4,7 @@
 ---运行时权威源仍是 Character 属性集：登录时存档灌回属性，强化成功时属性落盘。
 ---
 ---【为什么不存装备 / 背包物品 / 货币】这些由引擎原生负责，不要在这里再造一套：
+---  · 2026-09-30：金币1001/钻石1002由VirtualItemManager持有，下面ShouldPersist说明仅针对背包装备。
 ---  · 物品编辑器（wiki catalog/20101）里每个物品有「是否持久化」属性 = BP 上的 `ShouldPersist`，
 ---    勾选后该物品**可以跨对局存储**；实例化数据 CustomData 会随背包/仓库一同持久化
 ---    （wiki catalog/20104「背包系统」）。运行时可用 `UGCItemSystemV2.IsShouldPersist(ItemID)` 查询。

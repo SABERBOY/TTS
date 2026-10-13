@@ -1,16 +1,19 @@
 local R=require('Script.Blueprint.Prefabs.UI.Equip.Advance.EquipAdvanceRuntime')
 local C=require('Script.Blueprint.Prefabs.UI.Equip.Advance.EquipAdvanceConfig')
 local RPC={}
+local function send(pc,kind,result,context)
+    result.Kind=kind
+    if type(context)=='string' and #context<=160 then result.ClientRequestID=context end
+    UnrealNetwork.CallUnrealRPC(pc,pc,'Client_EquipAdvanceResult',result)
+    return result
+end
 local function reply(pc,kind,fn,context)
     local ok,result=pcall(fn)
     if not ok then
         print('[EquipAdvance] '..kind..' error: '..tostring(result))
         result={OK=false,Code='ServerError'}
     end
-    result.Kind=kind
-    if type(context)=='string' and #context<=160 then result.ClientRequestID=context end
-    UnrealNetwork.CallUnrealRPC(pc,pc,'Client_EquipAdvanceResult',result)
-    return result
+    return send(pc,kind,result,context)
 end
 function RPC.Snapshot(pc,context)
     return reply(pc,'Snapshot',function() return R.UISnapshot(pc) end,context)
@@ -24,9 +27,18 @@ function RPC.Preview(pc,target,materials,context)
     end,context)
 end
 function RPC.Commit(pc,token,request,confirmed)
-    return reply(pc,'Commit',function() return R.GetService(pc):Execute(token,request,confirmed) end,request)
+    local ok,err=pcall(function()
+        return R.GetService(pc):Execute(token,request,confirmed,function(result) send(pc,'Commit',result,request) end)
+    end)
+    if not ok then return send(pc,'Commit',{OK=false,Code='ServerError',Detail=tostring(err)},request) end
+    return err
 end
 function RPC.GM(pc,action,args)
+    if action=='quick' and type(args)=='table' and args[1]=='advance' and R.IsGM(pc) then
+        local ok,result=pcall(R.GMQuick,pc,args[1],args[2],function(r) send(pc,'GM',r) end)
+        if not ok then return send(pc,'GM',{OK=false,Code='ServerError',Detail=tostring(result)}) end
+        return result
+    end
     return reply(pc,'GM',function()
         if not R.IsGM(pc) then return {OK=false,Code='GMForbidden'} end
         if type(args)~='table' then args={} end

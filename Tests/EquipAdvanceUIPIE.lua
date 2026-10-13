@@ -5,11 +5,11 @@ function T.Setup(pc)
     assert(R.IsGM(pc) and not AdvanceUITestState,'GM required; clean previous fixture first')
     local s=R.GetService(pc); assert(not s.Busy and not s.Blocked)
     local a=s.A
-    AdvanceUITestState={Tag='advance-ui:'..os.time(),Gold=a:Balance(8310084),Diamond=a:Balance(8310132),Levels={}}
+    AdvanceUITestState={Tag='advance-ui:'..os.time(),Gold=a:Balance(1001),Diamond=a:Balance(1002),Levels={}}
     local state=AdvanceUITestState
     for i=1,6 do state.Levels[i]=a:SlotLevel(i);assert(R.GMLevel(pc,i,180).OK) end
-    assert(a:ChangeCurrency(8310084,10000)==10000)
-    assert(a:ChangeCurrency(8310132,100)==100)
+    assert(a:ChangeCurrency(1001,10000)==10000)
+    assert(a:ChangeCurrency(1002,100)==100)
     a:Begin()
     local ok,err=pcall(function()
         for _,recipe in ipairs({{8310131,6},{8310102,3},{8310093,1},{8310103,2},{8310104,2}}) do
@@ -31,7 +31,7 @@ function T.Audit(pc)
         if x.CustomData.AdvanceUIProbe==state.Tag then counts[x.ItemID]=(counts[x.ItemID] or 0)+1 end
     end
     local result={Kind='UIAcceptance',OK=true,Code='Audit',Counts=counts,
-        GoldSpent=state.Gold+10000-a:Balance(8310084),DiamondSpent=state.Diamond+100-a:Balance(8310132)}
+        GoldSpent=state.Gold+10000-a:Balance(1001),DiamondSpent=state.Diamond+100-a:Balance(1002)}
     UnrealNetwork.CallUnrealRPC(pc,pc,'Client_EquipAdvanceResult',result)
     return result
 end
@@ -44,7 +44,7 @@ function T.Cleanup(pc)
             assert(a:Remove(x)==1);removed=removed+1
         end
     end
-    for _,v in ipairs({{8310084,state.Gold},{8310132,state.Diamond}}) do
+    for _,v in ipairs({{1001,state.Gold},{1002,state.Diamond}}) do
         local delta=v[2]-a:Balance(v[1]);if delta~=0 then a:ChangeCurrency(v[1],delta) end
         assert(a:Balance(v[1])==v[2])
     end

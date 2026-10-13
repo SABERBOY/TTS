@@ -1,6 +1,6 @@
 # 装备升阶 UI 实施与维护
 
-更新：2026-09-28。本文对应现有 `Game_Equip_Develop_Transform_UIBP` 的升阶接入。基础规则、事务与三张配置表见[系统说明](equipment-advance-system.md)，改表流程见[维护手册](equipment-advance-maintenance.md)。所有相对路径以 TTS 项目根为准。
+更新：2026-09-30。本文对应现有 `Game_Equip_Develop_Transform_UIBP` 的升阶接入。基础规则、事务与三张配置表见[系统说明](equipment-advance-system.md)，改表流程见[维护手册](equipment-advance-maintenance.md)。所有相对路径以 TTS 项目根为准。
 
 ## 1. 玩家入口和行为
 
@@ -12,7 +12,7 @@ require('Script.Blueprint.Prefabs.UI.Equip.EquipPanelManager').Open({PageId='tra
 
 右侧按实例显示装备，按阶位、ItemID、实例Key稳定排序；相同ID的多件装备占不同列表行。每行显示名称、逻辑部位、独立阶位、槽位强化等级、穿戴/锁定/历史投入状态。未接入升阶的原生可穿戴装备也可查看，并提示未配置路线。
 
-选择一行后，左侧中央显示目标，周围显示需要的材料位，下方显示当前阶→下一阶、当前槽位等级/门槛、已选/所需材料数量、货币余额/消耗。消耗为0的货币控件折叠，例如白升绿仅显示金币。图标和颜色读取原生物品配置；紫、紫+1、紫+2可以同品质，必须看独立阶位文字。
+选择一行后，左侧中央显示目标，周围显示需要的材料位，下方显示当前阶→下一阶、当前槽位等级/门槛、已选/所需材料数量、货币余额/消耗。消耗为0的货币控件折叠，例如白升绿仅显示金币。装备图标和颜色读取原生物品配置；金币1001/钻石1002的数量和图标读取官方VirtualItemManager，维护见[虚拟货币说明](equipment-virtual-currency.md)；紫、紫+1、紫+2可以同品质，必须看独立阶位文字。
 
 - 白、绿、蓝：仅自动选取已查看、未保护、未穿戴、无历史投入的同ID实例。未知 Viewed 状态不自动消耗，可手动选材。本UI不会因为浏览而写入 Viewed。
 - 紫及以上：默认不选材料。点击空材料位或“选择材料”，右侧只显示目标之外的相同ItemID实例；再次点击已选材料可取消。受保护材料变灰且不能点击。
@@ -48,6 +48,8 @@ Controller仅增加 `ServerRPC_EquipAdvanceSnapshot` 白名单与转发，Previe
 - 原生绑定字段：Develop_Icon_0、Develop_Icon_01至06、Common_Currency1/2、NewButton_Start、NewButton_Choice、ReuseList2_Grade、TextBlock_3、TextBlock_Grade、TextBlock_Status、TextBlock_TargetName、TextBlock_Choose。
 
 费用/门槛/路线仍只维护三张 UE DataTable，不在UI脚本另存一套数值。布局、字号、颜色在原生UIBP维护；状态和错误提示在ViewModel/Panel维护。
+
+主界面绑定官方OnItemNumUpdatedDelegate自动刷新两个虚拟金额，关闭/Destruct移除，重新打开再绑定。升阶扣款可能异步，原token/request超时重试约定继续生效。
 
 ## 3. 数据、请求与生命周期
 

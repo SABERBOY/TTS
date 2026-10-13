@@ -3,6 +3,7 @@ local C=require('Script.Blueprint.Prefabs.UI.Equip.Advance.EquipAdvanceConfig')
 local D=require('Script.Blueprint.Prefabs.UI.Equip.Advance.EquipAdvanceData')
 local S=require('Script.Blueprint.Prefabs.UI.Equip.Advance.EquipAdvanceSystem')
 local G=require('Script.Blueprint.Prefabs.UI.Equip.Advance.EquipAdvanceGuard')
+local Currency=require('Script.Blueprint.Prefabs.UI.Equip.EquipCurrency')
 local R={Services=setmetatable({},{__mode='k'}),RecoveryByUID={}}
 local A={}; A.__index=A
 local RECOVERY_KEY='EquipAdvanceRecovery'
@@ -42,7 +43,7 @@ function A:List()
     end
     return out
 end
-function A:Balance(id) return UGCBackpackSystemV2.GetItemCountV2(self.PC,id) end
+function A:Balance(id) return Currency.Balance(self.PC,id) end
 function A:SlotLevel(slot)
     local system=require('Script.Blueprint.Prefabs.UI.Equip.EquipSlotSystem')
     return system.GetSlotLevel(nil,slot,pawn(self.PC))
@@ -54,10 +55,14 @@ end
 function A:Count(x) return UGCBackpackSystemV2.GetItemCountByDefineIDV2(self.PC,x.DefineID) end
 function A:CanRemove(x) return UGCBackpackSystemV2.CanRemoveItemV2(self.PC,x.DefineID,1)==1 end
 function A:CanEquip(id,slot) return UGCBackpackSystemV2.ItemCanEquipToSlot(self.PC,id,slot)==true end
-function A:Begin() self.Allocated={}; return true end
+function A:Begin()
+    if not Currency.Acquire(self.PC,self) then return false end
+    self.CurrencyLocked=true; self.Allocated={}; return true
+end
 function A:Finish()
     for _,x in ipairs(self.Allocated or {}) do G.Suppressed[x.Key]=nil end
     self.Allocated=nil
+    if self.CurrencyLocked then Currency.Release(self.PC,self); self.CurrencyLocked=nil end
 end
 function A:Allocate(id,data)
     assert(self.Allocated,'Allocate requires transaction guard')
@@ -82,8 +87,10 @@ end
 function A:Add(x) return UGCBackpackSystemV2.AddItemByDefineIDV2(self.PC,x.DefineID,1,false) end
 function A:Remove(x) return UGCBackpackSystemV2.RemoveItemByDefineIDV2(self.PC,x.DefineID,1) end
 function A:ChangeCurrency(id,delta)
-    if delta>=0 then return UGCBackpackSystemV2.AddItemV2(self.PC,id,delta) end
-    return UGCBackpackSystemV2.RemoveItemV2(self.PC,id,-delta)
+    return Currency.Change(self.PC,id,delta,self.CurrencyLocked and self or nil)
+end
+function A:ChangeCurrencyAsync(id,delta,done)
+    Currency.ChangeAsync(self.PC,id,delta,done,self.CurrencyLocked and self or nil)
 end
 function A:Unequip(x)
     if UGCBackpackSystemV2.UnEquipItemV2(self.PC,x.EquippedSlot)~=true then return false end
@@ -110,6 +117,7 @@ function A:RecordRecovery(j)
     end
     local id=uid(self.PC)
     R.RecoveryByUID[tostring(id)]=record
+    Currency.Block(self.PC,record)
     local archive=UGCPlayerStateSystem.GetPlayerArchiveData(id)
     if archive==nil then archive={} end
     assert(type(archive)=='table','Invalid archive root')
@@ -120,12 +128,16 @@ function A:RecordRecovery(j)
 end
 function R.GetService(pc)
     assert(UGCGameSystem.IsServer() and pc,'Server controller required')
-    if R.Services[pc] then return R.Services[pc] end
+    if R.Services[pc] then
+        local service=R.Services[pc]; local recovery=Currency.GetRecovery(pc)
+        if recovery then service.Blocked=true; service.Recovery=recovery end
+        return service
+    end
     local id=uid(pc); assert(id and id~=0,'Player UID not ready')
     local service=S.New(setmetatable({PC=pc},A))
     local archive=UGCPlayerStateSystem.GetPlayerArchiveData(id)
     assert(archive==nil or type(archive)=='table','Invalid archive root')
-    service.Recovery=R.RecoveryByUID[tostring(id)] or (archive and archive[RECOVERY_KEY])
+    service.Recovery=R.RecoveryByUID[tostring(id)] or (archive and archive[RECOVERY_KEY]) or Currency.GetRecovery(pc)
     service.Blocked=service.Recovery~=nil
     R.Services[pc]=service
     return service
@@ -183,14 +195,14 @@ function R.GMAdd(pc,id,count)
     id=tonumber(id); count=tonumber(count)
     if not id or not count or count~=math.floor(count) or count<1 then return {OK=false,Code='InvalidInput'} end
     local service=R.GetService(pc)
-    if service.Busy or service.Blocked then return {OK=false,Code='BusyOrRecovery'} end
+    if service.Busy or service.Blocked or Currency.IsBusy(pc) then return {OK=false,Code='BusyOrRecovery'} end
     local a=service.A
     if id==C.GoldItemID or id==C.DiamondItemID then
         if count>100000 then return {OK=false,Code='CountTooLarge'} end
         local n=a:ChangeCurrency(id,count); return {OK=n==count,Code='GMAdded',Count=n}
     end
     if not C.Items[id] or count>16 or not a:AssetReady(id) then return {OK=false,Code='InvalidItem'} end
-    local keys={}; a:Begin()
+    local keys={}; if a:Begin()==false then return {OK=false,Code='CurrencyBusy'} end
     local ok,err=pcall(function()
         for _=1,count do
             local x=a:Allocate(id,{EquipAdvance={Version=1,Viewed=true}})
@@ -207,7 +219,7 @@ function R.GMLevel(pc,slot,level)
     if not slot or not level or slot~=math.floor(slot) or slot<1 or slot>6
         or level~=math.floor(level) or level<0 or level>180 then return {OK=false,Code='InvalidInput'} end
     local service=R.GetService(pc)
-    if service.Busy or service.Blocked then return {OK=false,Code='BusyOrRecovery'} end
+    if service.Busy or service.Blocked or Currency.IsBusy(pc) then return {OK=false,Code='BusyOrRecovery'} end
     local p=pawn(pc); if not p then return {OK=false,Code='NoPawn'} end
     local system=require('Script.Blueprint.Prefabs.UI.Equip.EquipSlotSystem')
     local ok=system.SetSlotLevel(p,slot,level)
@@ -220,7 +232,7 @@ function R.GMProtect(pc,key,field,value)
     local allowed={Locked=true,Tracked=true,Reserved=true,InTrade=true,Viewed=true}
     if not allowed[field] or type(value)~='boolean' then return {OK=false,Code='InvalidInput'} end
     local service=R.GetService(pc)
-    if service.Busy or service.Blocked then return {OK=false,Code='BusyOrRecovery'} end
+    if service.Busy or service.Blocked or Currency.IsBusy(pc) then return {OK=false,Code='BusyOrRecovery'} end
     for _,x in ipairs(service.A:List()) do
         if x.Key==key then
             local original=D.Copy(x.CustomData)
@@ -239,14 +251,19 @@ function R.GMProtect(pc,key,field,value)
     end
     return {OK=false,Code='TargetNotOwned'}
 end
-function R.GMQuick(pc,action,request)
+function R.GMQuick(pc,action,request,complete)
     if not R.IsGM(pc) then return {OK=false,Code='GMForbidden'} end
     local service=R.GetService(pc)
-    if service.Busy or service.Blocked then return {OK=false,Code='BusyOrRecovery'} end
+    if service.Blocked or service.Busy and action~='advance' then
+        local result={OK=false,Code='BusyOrRecovery'}; if complete then complete(result) end; return result
+    end
+    if not service.Busy and Currency.IsBusy(pc) then
+        local result={OK=false,Code='CurrencyBusy'}; if complete then complete(result) end; return result
+    end
     local quick=require('Script.Blueprint.Prefabs.UI.Equip.Advance.EquipAdvanceGM')
     if action=='money' then return quick.Money(service)
     elseif action=='equipment' then return quick.Equipment(service)
-    elseif action=='advance' then return quick.AdvanceOnce(service,request)
+    elseif action=='advance' then return quick.AdvanceOnce(service,request,complete)
     elseif action=='levels' then
         for slot=1,6 do
             local result=R.GMLevel(pc,slot,180)

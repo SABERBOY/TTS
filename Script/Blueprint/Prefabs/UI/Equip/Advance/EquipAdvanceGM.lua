@@ -7,10 +7,10 @@ function Q.Money(s)
     local added={}; local ok=true
     for _,entry in ipairs({{C.GoldItemID,100000},{C.DiamondItemID,1000}}) do
         local before=s.A:Balance(entry[1])
-        local called=pcall(s.A.ChangeCurrency,s.A,entry[1],entry[2])
+        local called,n=pcall(s.A.ChangeCurrency,s.A,entry[1],entry[2])
         local delta=s.A:Balance(entry[1])-before
         added[tostring(entry[1])]=delta
-        ok=ok and called and delta==entry[2]
+        ok=ok and called and n==entry[2] and delta==entry[2]
     end
     return {OK=ok,Code=ok and 'GMQuickMoneyAdded' or 'GMQuickMoneyPartial',Added=added}
 end
@@ -48,10 +48,15 @@ function Q.Equipment(s)
     return {OK=ok and finished,Code=ok and finished and 'GMQuickEquipmentAdded' or 'GMQuickEquipmentPartial',
         Added=#keys,Planned=total,Keys=keys,Detail=tostring(err or finishError)}
 end
-function Q.AdvanceOnce(s,request)
-    if type(request)~='string' or #request==0 or #request>100 then return {OK=false,Code='InvalidRequest'} end
+function Q.AdvanceOnce(s,request,complete)
+    local function respond(r) if complete then complete(r) end; return r end
+    if type(request)~='string' or #request==0 or #request>100 then return respond({OK=false,Code='InvalidRequest'}) end
     request='gmquick:'..request
-    if s.Requests[request] then return D.Copy(s.Requests[request].Result) end
+    if s.Requests[request] then return respond(D.Copy(s.Requests[request].Result)) end
+    if s.Busy then
+        if s.Journal and s.Journal.RequestID==request then return s:Execute(s.Journal.Token,request,true,complete) end
+        return respond({OK=false,Code='Busy'})
+    end
     local items=s.A:List(); local groups={}; local reasons={}
     for _,x in ipairs(items) do
         if C.Items[x.ItemID] and x.Count==1 and not D.IsProtected(x) and D.ValidState(x.CustomData)
@@ -76,13 +81,14 @@ function Q.AdvanceOnce(s,request)
             local p=s:Preview(target.Key,materials)
             if p.OK then
                 -- Exactly one execution per click; never continue after a failed transaction.
-                local r=s:Execute(p.Token,request,true)
-                r.TargetItemID=id
+                local r=s:Execute(p.Token,request,true,function(result)
+                    result.TargetItemID=id; if complete then complete(result) end
+                end)
                 return r
             end
             reasons[p.Code]=(reasons[p.Code] or 0)+1
         end
     end
-    return {OK=false,Code='NoAdvanceAvailable',Reasons=reasons}
+    return respond({OK=false,Code='NoAdvanceAvailable',Reasons=reasons})
 end
 return Q

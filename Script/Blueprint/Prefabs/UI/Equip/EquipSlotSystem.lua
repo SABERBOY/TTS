@@ -6,6 +6,7 @@
 ---  服务端权威：等级存 Character 属性集 EquipSlotLv_* 自定义属性（复制），经 ServerRPC_StrengthenEquipSlot 事务修改。
 ---表数据已对照策划配置校验：180 行逐级，单槽 1-180 总消耗 = 54270 金币 / 1170 零件；累计 +1000 攻击 / +3300 生命。
 local EquipSlotSystem = {}
+local Currency = require('Script.Blueprint.Prefabs.UI.Equip.EquipCurrency')
 
 EquipSlotSystem.MAX_LEVEL = 180
 
@@ -13,7 +14,7 @@ EquipSlotSystem.MAX_LEVEL = 180
 -- （Level/ColorStage/AtkPerLevel/HpPerLevel/CumAtk/CumHp/GoldCost/PartsCost/CumGold/CumParts/RankCap）
 EquipSlotSystem.STRENGTHEN_TABLE_PATH = 'Asset/Data/Table/Customized/EquipStrengthenLevel.EquipStrengthenLevel'
 
--- 装备零件物品 ID 接入点：项目物品表尚未定义"装备零件"，定义后在此填入 ItemID。
+-- 装备零件仍未接入。以后启用须先扩展 UGCObject/EquipCurrency 的虚拟定义，不能直接填写旧背包ID。
 -- 为 nil 时零件校验与扣除跳过（只扣金币），并打印警告。
 EquipSlotSystem.PartsItemID = nil
 
@@ -415,22 +416,16 @@ end
 
 --==================== 货币与零件 ====================
 
----金币 = 游戏内第一货币（货币即背包物品，不占格子）
+---金币来自 UGCObject / VirtualItemManager，与背包货币列表顺序无关。
 function EquipSlotSystem.GetGoldItemID(Player)
-    if not Player then return nil end
-    local IDs = UGCBackpackSystemV2.GetCurrencyIDList(Player)
-    -- GetCurrencyIDList 返回 TArray(userdata)，用 # 判长度、下标取值，不能用 type=='table'
-    if IDs and (type(IDs) == 'table' or type(IDs) == 'userdata') and #IDs > 0 then
-        return IDs[1]
-    end
-    return nil
+    return Currency.GoldItemID
 end
 
 function EquipSlotSystem.GetItemCount(Player, ItemID)
     if not Player or not ItemID then
         return 0
     end
-    return UGCBackpackSystemV2.GetItemCountV2(Player, ItemID) or 0
+    return Currency.TryBalance(Player, ItemID) or 0
 end
 
 function EquipSlotSystem.GetPlayerGold(Player)
@@ -496,72 +491,73 @@ end
 
 --==================== 服务端强化事务 ====================
 
----服务端执行槽位强化（原子事务：全部校验通过后才扣除与升级，任一步失败整笔不生效）
+---服务端执行槽位强化，扣款可能异步；Complete 收到最终结果，Pending 不是成功。
 ---@return boolean OK, string|nil ErrCode, number|nil NewLevel
-function EquipSlotSystem.ServerTryStrengthen(PlayerState, Player, SlotIdx, Count)
+function EquipSlotSystem.ServerTryStrengthen(PlayerState, Player, SlotIdx, Count, Complete)
+    local function reject(code)
+        if Complete then pcall(Complete,false,code) end
+        return false,code
+    end
     if not UGCGameSystem.IsServer() then
-        return false, 'ClientForbidden'
+        return reject('ClientForbidden')
     end
     if not PlayerState or not Player then
-        return false, 'InvalidPlayer'
+        return reject('InvalidPlayer')
     end
     local SlotDef = EquipSlotSystem.GetSlotDef(SlotIdx)
     if not SlotDef then
-        return false, 'InvalidSlot'
+        return reject('InvalidSlot')
     end
+    Count=Count or 1
+    if type(Count)~='number' or Count~=math.floor(Count) or Count<1 or Count>180 then return reject('InvalidCount') end
+    local PC=Currency.Controller(Player)
+    if not PC then return reject('InvalidPlayer') end
+    local ready,recovery=pcall(Currency.GetRecovery,PC)
+    if not ready then return reject('CurrencyNotReady') end
+    if recovery then return reject('RecoveryRequired') end
 
     local Cur = EquipSlotSystem.GetSlotLevel(PlayerState, SlotIdx, Player)
     if Cur >= EquipSlotSystem.MAX_LEVEL then
-        return false, 'MaxLevel'
+        return reject('MaxLevel')
     end
 
     local GoldCost, PartsCost, Target = EquipSlotSystem.GetBatchCost(Cur, Count)
     if Target <= Cur then
-        return false, 'MaxLevel'
+        return reject('MaxLevel')
     end
 
-    -- 余额校验（服务端 RPC 顺序执行，先全量校验再扣除，避免部分扣除）
-    local GoldID = EquipSlotSystem.GetGoldItemID(Player)
-    if not GoldID then
-        return false, 'NoGoldCurrency'
+    local fees={{ID=Currency.GoldItemID,Cost=GoldCost,ShortCode='NotEnoughGold'}}
+    if EquipSlotSystem.PartsItemID then
+        fees[#fees+1]={ID=EquipSlotSystem.PartsItemID,Cost=PartsCost,ShortCode='NotEnoughParts'}
     end
-    if EquipSlotSystem.GetItemCount(Player, GoldID) < GoldCost then
-        return false, 'NotEnoughGold'
+    local adapter={}
+    function adapter:Begin() return Currency.Acquire(PC,self) end
+    function adapter:Finish() Currency.Release(PC,self) end
+    function adapter:Balance(id) return Currency.Balance(PC,id) end
+    function adapter:Change(id,delta,done) Currency.ChangeAsync(PC,id,delta,done,self) end
+    function adapter:Level() return EquipSlotSystem.GetSlotLevel(PlayerState,SlotIdx,Player) end
+    function adapter:SetLevel(level) return EquipSlotSystem.SetSlotLevel(Player,SlotIdx,level) end
+    function adapter:RecordRecovery(record)
+        record.SlotIdx=SlotIdx; Currency.Block(PC,record)
+        print('[EquipSlotSystem] RECOVERY REQUIRED slot='..SlotIdx)
     end
-    local PartsID = EquipSlotSystem.PartsItemID
-    if PartsID and EquipSlotSystem.GetItemCount(Player, PartsID) < PartsCost then
-        return false, 'NotEnoughParts'
+    function adapter:AfterCommit()
+        local Persist=require('Script.Blueprint.Prefabs.UI.Equip.EquipSlotPersist')
+        local saved=Persist.SaveLevels(Player,PlayerState)
+        require('Script.Blueprint.Prefabs.UI.Equip.EquipSlotAttrApplier').RefreshSlot(Player,SlotIdx)
+        print('[EquipSlotSystem] 强化成功 slot='..SlotIdx..' '..Cur..'->'..Target..' gold-'..GoldCost)
+        if not saved then
+            print('[EquipSlotSystem] 强化等级保存待重试 slot='..SlotIdx)
+            error('SaveLevelsPending')
+        end
     end
-
-    -- 扣除
-    UGCBackpackSystemV2.RemoveItemV2(Player, GoldID, GoldCost)
-    if PartsID then
-        UGCBackpackSystemV2.RemoveItemV2(Player, PartsID, PartsCost)
-    else
-        print('[EquipSlotSystem] 警告：PartsItemID 未接入，本次强化未扣除装备零件（' .. tostring(PartsCost) .. '）')
-    end
-
-    -- 升级（Character 属性集 EquipSlotLv_* 为复制属性，客户端自动同步）
-    if not EquipSlotSystem.SetSlotLevel(Player, SlotIdx, Target) then
-        return false, 'SetLevelFailed'
-    end
-
-    -- 落盘：只把六槽强化等级写入玩家存档。
-    -- 装备/背包物品/货币的跨对局保留由引擎原生负责（物品编辑器的「是否持久化」ShouldPersist），
-    -- 本项目不再自己存一套，否则会和引擎的背包持久化重复且互相干扰。
-    -- 延迟 require：EquipSlotPersist 顶层 require 了本模块，直接互相 require 会形成循环
-    local OKPersist, EquipSlotPersist = pcall(require, 'Script.Blueprint.Prefabs.UI.Equip.EquipSlotPersist')
-    if OKPersist and EquipSlotPersist then
-        EquipSlotPersist.SaveLevels(Player, PlayerState)
-    end
-
-    -- 刷新槽位强化属性加成（服务端）
-    local EquipSlotAttrApplier = require('Script.Blueprint.Prefabs.UI.Equip.EquipSlotAttrApplier')
-    EquipSlotAttrApplier.RefreshSlot(Player, SlotIdx)
-
-    print(string.format('[EquipSlotSystem] 强化成功 Slot=%d(%s) %d->%d 金币-%d 零件-%d',
-        SlotIdx, SlotDef.Name, Cur, Target, GoldCost, PartsCost))
-    return true, nil, Target
+    local T=require('Script.Blueprint.Prefabs.UI.Equip.EquipStrengthenTransaction')
+    local result=T.Run(adapter,Cur,Target,fees,function(r)
+        local why; if not r.OK then why=r.Code end
+        if Complete then Complete(r.OK,why,r.Level) end
+    end)
+    local why; if not result.OK then why=result.Code end
+    return result.OK,why,result.Level
 end
 
 --==================== 客户端请求 ====================

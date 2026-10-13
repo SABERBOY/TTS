@@ -409,9 +409,10 @@ function UGCPlayerController:ServerRPC_StrengthenEquipSlot(SlotIdx, BatchCount)
     if not CurPlayerState or not PlayerPawn then
         return
     end
-    local OK, ErrCode, NewLevel = EquipSlotSystem.ServerTryStrengthen(CurPlayerState, PlayerPawn, SlotIdx, BatchCount or 1)
-    print(string.format("ServerRPC_StrengthenEquipSlot Slot=%s Count=%s OK=%s Err=%s NewLevel=%s",
-        tostring(SlotIdx), tostring(BatchCount), tostring(OK), tostring(ErrCode), tostring(NewLevel)))
+    EquipSlotSystem.ServerTryStrengthen(CurPlayerState, PlayerPawn, SlotIdx, BatchCount or 1,function(OK,ErrCode,NewLevel)
+        print(string.format("ServerRPC_StrengthenEquipSlot Slot=%s Count=%s OK=%s Err=%s NewLevel=%s",
+            tostring(SlotIdx), tostring(BatchCount), tostring(OK), tostring(ErrCode), tostring(NewLevel)))
+    end)
 end
 
 -- 服务端：客户端上报"装备槽发生变化"，重算该槽（或全量）槽位强化加成。
@@ -433,7 +434,7 @@ function UGCPlayerController:ServerRPC_NotifyEquipSlotChanged(SlotName)
     EquipSlotAttrApplier.OnEquipChanged(PlayerPawn, SlotName)
 end
 
----GM：添加物品。ItemID=0 时加第一货币（金币）
+---GM：添加物品。ItemID=0 或1001/1002走官方虚拟货币，装备仍走背包。
 function UGCPlayerController:ServerRPC_GMAddItem(ItemID, Count)
     ItemID = tonumber(ItemID)
     Count = math.floor(tonumber(Count) or 1)
@@ -446,6 +447,14 @@ function UGCPlayerController:ServerRPC_GMAddItem(ItemID, Count)
     end
     if not ItemID then
         print('[GM] ServerRPC_GMAddItem: no ItemID')
+        return
+    end
+    local Currency=require('Script.Blueprint.Prefabs.UI.Equip.EquipCurrency')
+    if ItemID==Currency.GoldItemID or ItemID==Currency.DiamondItemID then
+        if not UGCGameSystem.IsEnableGM(self) then return end
+        Currency.ChangeAsync(self,ItemID,Count,function(ok,n,err)
+            print('[GM] virtual currency id='..ItemID..' added='..n..' ok='..tostring(ok)..' err='..tostring(err))
+        end)
         return
     end
     local OK, Err = pcall(function()

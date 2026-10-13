@@ -1,6 +1,7 @@
 -- Saved UE DataTables are the only runtime configuration source.
 -- Fixed contract: six major ranks, twelve stages, maximum strengthen level 180.
-local C={GoldItemID=8310084,DiamondItemID=8310132}
+local Currency=require('Script.Blueprint.Prefabs.UI.Equip.EquipCurrency')
+local C={GoldItemID=Currency.GoldItemID,DiamondItemID=Currency.DiamondItemID}
 local data={Ranks={},Rules={},ItemRows={},Items={}}
 local attempted=false
 local base='Asset/Data/Table/Customized/'

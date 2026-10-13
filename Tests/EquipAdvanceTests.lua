@@ -16,7 +16,7 @@ local function fixture(id, count, equipped)
     function a:IsServer() return true end
     function a:Now() return self.Time end
     function a:List() local r={}; for _,x in pairs(self.Items) do r[#r+1]=copy(x) end; return r end
-    function a:Balance(id) return id==8310084 and self.Gold or self.Diamond end
+    function a:Balance(id) return id==1001 and self.Gold or self.Diamond end
     function a:SlotLevel() return self.Level end
     function a:AssetReady(item) return Config.Items[item] ~= nil end
     function a:Count(x) return self.Items[x.Key] and 1 or 0 end
@@ -41,7 +41,7 @@ local function fixture(id, count, equipped)
         self.Items[x.Key]=nil; return 1
     end
     function a:ChangeCurrency(id, delta)
-        local field=id==8310084 and 'Gold' or 'Diamond'
+        local field=id==1001 and 'Gold' or 'Diamond'
         if not self:Hit('Currency') then return 0 end
         self[field]=self[field]+delta; return math.abs(delta)
     end
@@ -321,6 +321,51 @@ test('GM full equipment pack advances one transaction at a time until exhausted'
         assert(count(a)==before-rule.Materials)
     end
     error('quick advance failed to terminate')
+end)
+local function deferred(a)
+    a.Queue={}
+    function a:ChangeCurrencyAsync(id,delta,done) self.Queue[#self.Queue+1]={ID=id,Delta=delta,Done=done} end
+    function a:Flush(ok,actual)
+        local job=table.remove(self.Queue,1); assert(job,'missing pending currency operation')
+        local n=actual or math.abs(job.Delta)
+        local field=job.ID==Config.GoldItemID and 'Gold' or 'Diamond'
+        self[field]=self[field]+(job.Delta<0 and -n or n)
+        job.Done(ok~=false,n); job.Done(ok~=false,n) -- duplicate native callback is harmless
+    end
+end
+test('deferred debit retains lock, replay waits and output appears only after both results',function()
+    local a,s=fixture(8310102,3); deferred(a)
+    local p=preview(s,'k1',{'k2','k3'}); local results={}
+    assert(s:Execute(p.Token,'async',true,function(r) results[#results+1]=r end).Code=='Pending')
+    assert(s.Busy and count(a)==0 and a.Gold==10000 and #results==0)
+    assert(s:Execute(p.Token,'async',true,function(r) results[#results+1]=r end).Code=='Pending')
+    assert(s:Execute('other','async',true).Code=='RequestConflict')
+    assert(s:Execute(p.Token,'different',true).Code=='Busy')
+    a:Flush(); assert(s.Busy and count(a)==0 and a.Gold==9350)
+    a:Flush(); assert(not s.Busy and count(a)==1 and a.Diamond==99 and #results==2)
+    assert(results[1].NewKey==results[2].NewKey and commit(s,p,'async',true).NewKey==results[1].NewKey)
+end)
+test('second currency failure waits for refund and restores consumed native instances',function()
+    local a,s=fixture(8310102,3); deferred(a)
+    local result; local p=preview(s,'k1',{'k2','k3'})
+    s:Execute(p.Token,'refund',true,function(r) result=r end)
+    a:Flush(); a:Flush(false,0)
+    assert(s.Busy and not result and count(a)==3 and a.Gold==9350 and #a.Queue==1)
+    a:Flush(); assert(result.Code=='TransactionFailed' and not s.Busy and a.Gold==10000 and a.Diamond==100)
+end)
+test('deferred refund failure records recovery and blocks further transactions',function()
+    local a,s=fixture(8310102,3); deferred(a)
+    local result; s:Execute(preview(s,'k1',{'k2','k3'}).Token,'bad-refund',true,function(r) result=r end)
+    a:Flush(); a:Flush(false,0); a:Flush(false,0)
+    assert(result.Code=='RecoveryRequired' and s.Blocked and a.Recovery and a.Gold==9350)
+end)
+test('GM deferred same click waits and caller callback errors cannot strand service',function()
+    local Q=require('Script.Blueprint.Prefabs.UI.Equip.Advance.EquipAdvanceGM')
+    local a,s=fixture(8310131,2); deferred(a); local delivered=0
+    assert(Q.AdvanceOnce(s,'same',function() error('caller disconnected') end).Code=='Pending')
+    assert(Q.AdvanceOnce(s,'same',function(r) assert(r.OK); delivered=delivered+1 end).Code=='Pending')
+    a:Flush(); assert(not s.Busy and count(a)==1 and delivered==1)
+    assert(Q.AdvanceOnce(s,'same').TargetItemID==8310131 and a.Gold==9900)
 end)
 print(string.format('EquipAdvance: %d tests passed',total))
 return total

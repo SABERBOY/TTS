@@ -1,6 +1,6 @@
 # 装备升阶系统与 GM 验证
 
-更新：2026-09-28。实现范围为独立升阶逻辑、原生背包适配、实例数据继承、Controller RPC、GM，以及装备主界面“养成 → 升阶”UI。未修改装备蓝图属性/技能、掉落、商店或原槽位强化的消耗规则。UI操作、资产和维护细节见[升阶UI维护](equipment-advance-ui.md)。
+更新：2026-09-30。实现范围为独立升阶逻辑、原生背包适配、实例数据继承、Controller RPC、GM，以及装备主界面“养成 → 升阶”UI。金币/钻石已统一为UGCObject中的1001/1002和官方VirtualItemManager，详见[虚拟货币维护](equipment-virtual-currency.md)。未修改装备蓝图属性/技能、掉落、商店或原槽位强化费用曲线。UI操作、资产和维护细节见[升阶UI维护](equipment-advance-ui.md)。
 
 后续调整请从[维护手册](equipment-advance-maintenance.md)进入；可复用 Codex skill 的项目源码见[tts-equipment-maintenance](skills/tts-equipment-maintenance/SKILL.md)。
 
@@ -26,11 +26,11 @@
 
 保存三张表后重新启动PIE。客户端与服务端各自在首次实际查询时通过GetTableData读取保存的UE资产，每次运行缓存一次；不支持正在运行中的热换表。任何一张表缺失或结构不合法，整个升阶配置保持为空，日志输出 `[EquipAdvanceConfig] DISABLED`，GM自检的Errors显示原因，不会静默使用旧的硬编码费用。
 
-LuaCheck会在游戏世界尚未初始化时导入所有脚本。配置模块因此不在导入时调用原生接口；原槽位模块的阶位元数据复制也从导入阶段移到GetRank实际查询时执行。这是唯一额外的原系统加载时机调整，业务规则和Controller RPC不变。游戏内只使用官方UGC资源/数据表API；工程Lua测试也不使用io、dofile、loadfile或动态源码加载，离线测试由Python读取快照和源码。
+LuaCheck会在游戏世界尚未初始化时导入所有脚本。配置模块因此不在导入时调用原生接口；原槽位模块的阶位元数据复制也从导入阶段移到GetRank实际查询时执行。该加载时机约定继续保留；货币迁移新增共享网关、异步事务和Controller回调，业务配置接口不变。游戏内只使用官方UGC资源/数据表API；工程Lua测试也不使用io、dofile、loadfile或动态源码加载，离线测试由Python读取快照和源码。
 
 `Tests/Fixtures/EquipAdvanceTables.json` 是原值迁移及回归测试快照，**不是运行时备用配置**。有意调整配置后，需要更新对应测试期望；不能把修改测试快照当成修改游戏数据。
 
-| 当前阶→下一阶 | 当前阶强化门槛 | 材料 | 金币 8310084 | 钻石 8310132 |
+| 当前阶→下一阶 | 当前阶强化门槛 | 材料 | 金币 1001 | 钻石 1002 |
 |---|---:|---:|---:|---:|
 | 白→绿 | 10 | 1 | 100 | 0 |
 | 绿→蓝 | 20 | 1 | 200 | 0 |
@@ -75,6 +75,7 @@ LuaCheck会在游戏世界尚未初始化时导入所有脚本。配置模块因
 
 | 模块 | 职责 |
 |---|---|
+| EquipCurrency / EquipStrengthenTransaction | 官方虚拟货币、共享锁及槽位强化异步补偿 |
 | EquipAdvanceConfig | 阶位、费用、ItemID路径和配置自检 |
 | EquipAdvanceData | CustomData复制、签名、保护/安全选材规则、账本合法性 |
 | EquipAdvanceSystem | 可注入背包适配器的纯 Lua 预览、执行、幂等和补偿事务 |
@@ -141,7 +142,7 @@ CustomData.EquipAdvance = {
 
 白饰品测试：
 
-1. “添加升阶测试物品”依次输入 `8310131 2`、`8310084 1000`。
+1. “添加升阶测试物品”依次输入 `8310131 2`、`1001 1000`。
 2. “设置测试强化等级”输入 `3 10`。
 3. “列出装备实例”，找到两个不同的 `8310131` 实例Key。
 4. “预览升阶”输入 `目标Key 材料Key`（此例可只填目标Key自动选择）。确认结果为 Ready、下一阶8310130、100金币。
@@ -150,7 +151,7 @@ CustomData.EquipAdvance = {
 
 用户示例的紫+1手套测试：
 
-1. 添加 `8310102 3`、`8310084 650`、`8310132 1`，设置测试等级 `4 60`。
+1. 添加 `8310102 3`、`1001 650`、`1002 1`，设置测试等级 `4 60`。
 2. 列出三个不同实例Key；预览输入 `目标Key 材料Key1 材料Key2`。
 3. 预览应为8310102→8310101、650金币、1钻石、需确认；输入 `YES` 后得到一个8310101背包实例。
 
@@ -167,7 +168,9 @@ local R = require('Script.Blueprint.Prefabs.UI.Equip.Advance.EquipAdvanceRuntime
 local s = R.GetService(pc)
 local candidates = s:Candidates(targetKey)
 local preview = s:Preview(targetKey, {materialKey1, materialKey2})
-local result = s:Execute(preview.Token, requestID, true)
+local immediate = s:Execute(preview.Token, requestID, true, function(result)
+    -- 在回调处理最终结果；immediate.Code=Pending 时仍在等待扣款。
+end)
 ```
 
 GM旧调用仍为 `EquipAdvanceClient.Preview(targetKey, materialKeys)`、`Confirm(true)`。玩家UI使用Snapshot、PreviewForUI、CommitForUI，Subscribe/Unsubscribe接收带ClientRequestID的结果。LastSnapshot单独存放，不覆盖GM用的LastResult。Controller只接受实例Key/预览token、请求号和确认状态，不接受客户端决定的消耗/下一阶ID。成功/失败后刷新实例列表，超时重试复用原token和请求号。
@@ -189,13 +192,15 @@ GM旧调用仍为 `EquipAdvanceClient.Preview(targetKey, materialKeys)`、`Confi
 
 ## 已执行验证与边界
 
+当前货币迁移：64组离线及10组原生回调验收已通过，详细证据与边界见[虚拟货币维护](equipment-virtual-currency.md)。以下保留前期配置/背包验收记录。
+
 纯Lua5.1测试：`python Tests/run_equipment_tests.py`，使用已安装的Lupa（`lupa.lua51`），原23组业务测试和新增17组读表测试通过。读表测试覆盖导入阶段零原生调用、首次查询加载、乱序行、字段转换、修改费用确实生效、缺表、重复序号、错误RankID、缺失消耗规则、行名不一致、重复系列阶段、跳阶/跨系列/循环路线、非法费用/材料/门槛/槽位/大阶小阶；任何失败都原子拒绝发布三组配置。业务测试覆盖全部11条费用/数量规则、独立小阶、旧装备兼容、同ID约束、自动选材、保护/归属/等级/余额、过期/重复请求、账本、满背包及移除/扣款/保存/生成/穿戴故障补偿和补偿失败阻断。
 
 用户报告的 `merge historical ledgers exactly once` 断言已修复：原测试带历史投入的材料被安全自动选材排除；现在明确指定材料，并额外断言自动选择会排除它。账本期望值仍为150金币、5钻石、21材料参考值，未放宽生产选材规则。测试模块只在显式 `.Run()` 时运行，导入/LuaCheck不会执行故障测试。
 
 真实单客户端PIE/DS：`Tests/EquipAdvancePIE.lua` 的6项检查通过，测试完成清理=true。包括：强化不足零扣款；背包白→绿及重复请求；绿→蓝及缺失紫阶拒绝；穿戴紫+1→紫+2、手选确认及属性重复刷新不叠加；创建保存失败后的原生补偿；原生穿戴已经成功但适配器返回失败后的装备/金币恢复。测试需在GM服务端显式调用Run(pc)，会创建带标记测试装备并恢复测试前货币、等级、穿戴及攻击值，不在LuaCheck中自动执行。Tests不在运行模块打包路径中，真实DS不能依赖require加载它；本次通过宿主工具读取已审阅源码，再作为字面代码投递官方Lua控制台执行，具体方式见[维护手册第7节](equipment-advance-maintenance.md#73-真实-pieds-测试装载)。游戏Lua不使用文件读取或动态源码装载。
 
-客户端→Controller RPC→服务端→客户端同步另行实测通过：调用GM配置自检和确认入口，白饰品合成绿饰品，客户端原生背包读回新ItemID、自定义标记、100金币账本及旧实例消失；测试物品和状态已清理。39件装备资产检查及两种货币ShouldPersist读回通过。
+客户端→Controller RPC→服务端→客户端同步另行实测通过：调用GM配置自检和确认入口，白饰品合成绿饰品，客户端原生背包读回新ItemID、自定义标记、100金币账本及旧实例消失；测试物品和状态已清理。39件装备资产检查通过；此前原背包货币ShouldPersist验收仅属于旧币历史，新虚拟账户持久化需另行云环境验收。
 
 新增快捷GM的原生测试为 `Tests/EquipAdvanceGMPIE.lua`，显式 `.Run(pc)`。在DS实测重复加钱、一次57件、6槽180、逐次27次合成后无可用组合，剩27件；每次重发同请求都未多扣材料。测试选择范围隔离到新生成物品，结束已恢复货币/等级并清理全部测试装备。
 

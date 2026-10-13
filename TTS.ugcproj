@@ -9,7 +9,7 @@ ProjectShortPath=/TTS/
 StartMapName=/TTS/UGCmap
 MapMode=0
 bIsBigWorld=0
-Version=1.38.12.15918
+Version=1.38.12.15922
 UpdateVersion=10
 GameModePath=/TTS/Asset/Blueprint/UGCGameMode.UGCGameMode_C
 

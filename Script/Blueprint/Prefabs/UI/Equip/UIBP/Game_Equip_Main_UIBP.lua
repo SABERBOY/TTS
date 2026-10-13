@@ -18,6 +18,7 @@
 ---  一级：装备 / 养成；养成下二级：强化 / 转化。
 ---  关闭按钮与页签 NewButton 的 OnClicked 不在 Construct 绑定（会原生崩溃），延迟到 InitData。
 local EquipSlotSystem = require('Script.Blueprint.Prefabs.UI.Equip.EquipSlotSystem')
+local Currency = require('Script.Blueprint.Prefabs.UI.Equip.EquipCurrency')
 
 local PAGE_BASICS = 'basics'
 local PAGE_STRENGTHEN = 'strengthen'
@@ -83,7 +84,7 @@ local function SetCurrencyIcon(ImageWidget, ItemID)
         return
     end
     local OK, Path = pcall(function()
-        return UGCItemSystemV2.GetItemIconTextureV2(ItemID)
+        return Currency.GetData(ItemID).ItemIcon
     end)
     local PathStr = SoftPathToString(OK and Path or nil)
     if not PathStr then
@@ -407,14 +408,8 @@ end
 function Game_Equip_Main_UIBP:RefreshCurrencies()
     local OK, Err = pcall(function()
         local PC = UGCGameSystem.GetLocalPlayerController()
-        local IDs = nil
-        if PC then
-            IDs = UGCBackpackSystemV2.GetCurrencyIDList(PC)
-        end
-        local Count = 0
-        if IDs and (type(IDs) == 'table' or type(IDs) == 'userdata') then
-            Count = #IDs
-        end
+        local IDs = {Currency.GoldItemID,Currency.DiamondItemID}
+        local Count = #IDs
         for i = 1, 4 do
             local Widget = self['Currency_' .. i]
             if Widget then
@@ -423,9 +418,9 @@ function Game_Equip_Main_UIBP:RefreshCurrencies()
                 else
                     Widget:SetVisibility(ESlateVisibility.SelfHitTestInvisible)
                     local ItemID = IDs[i]
-                    local Amount = EquipSlotSystem.GetItemCount(PC, ItemID)
+                    local Amount = Currency.TryBalance(PC, ItemID)
                     if Widget.TextBlock_Currency_Amount then
-                        Widget.TextBlock_Currency_Amount:SetText(tostring(Amount or 0))
+                        Widget.TextBlock_Currency_Amount:SetText(Amount and tostring(Amount) or '—')
                     end
                     SetCurrencyIcon(Widget.Image_Currency_Icon, ItemID)
                 end
@@ -434,6 +429,23 @@ function Game_Equip_Main_UIBP:RefreshCurrencies()
     end)
     if not OK then
         print('[EquipMain] RefreshCurrencies err=' .. tostring(Err))
+    end
+end
+
+function Game_Equip_Main_UIBP:OnCurrencyChanged()
+    self:Refresh()
+end
+function Game_Equip_Main_UIBP:BindCurrencies()
+    self:UnbindCurrencies()
+    local ok,manager=pcall(Currency.GetManager)
+    if not ok then return end
+    manager.OnItemNumUpdatedDelegate:Add(self.OnCurrencyChanged,self)
+    self.CurrencyManager=manager
+end
+function Game_Equip_Main_UIBP:UnbindCurrencies()
+    if self.CurrencyManager then
+        pcall(function() self.CurrencyManager.OnItemNumUpdatedDelegate:Remove(self.OnCurrencyChanged,self) end)
+        self.CurrencyManager=nil
     end
 end
 
@@ -452,10 +464,12 @@ function Game_Equip_Main_UIBP:InitData(InParams)
     print('[EquipMain] InitData page=' .. tostring(InParams.PageId) .. ' slot=' .. tostring(InParams.SlotIdx))
     self:EnsureCloseBound()
     self:EnsureTabListsBound()
+    self:BindCurrencies()
     self:SwitchToPage(InParams.PageId or PAGE_BASICS, InParams)
 end
 
 function Game_Equip_Main_UIBP:OnCloseClicked()
+    self:UnbindCurrencies()
     local Child = self:GetVisibleChild()
     if Child and CheckObjectContainsField(Child, 'Deactivate', true) then Child:Deactivate() end
     print('[EquipMain] close')
@@ -467,6 +481,7 @@ function Game_Equip_Main_UIBP:OnCloseClicked()
 end
 
 function Game_Equip_Main_UIBP:Destruct()
+    self:UnbindCurrencies()
     if self.ReuseList2_Level1 then
         pcall(function()
             self.ReuseList2_Level1.OnUpdateItem:Remove(self.OnUpdateLevel1Item, self)

@@ -197,6 +197,10 @@ function Game_Equip_Develop_Strengthen_UIBP:Refresh()
         local Currency = self.Common_Currency
         if Currency and Currency.TextBlock_Currency_Amount then
             Currency.TextBlock_Currency_Amount:SetText(tostring(Preview.GoldHave))
+            local money=require('Script.Blueprint.Prefabs.UI.Equip.EquipCurrency')
+            local ready,data=pcall(money.GetData,money.GoldItemID)
+            require('Script.Blueprint.Prefabs.UI.Equip.Advance.EquipAdvanceUIRender').Image(
+                Currency.Image_Currency_Icon,ready and data.ItemIcon or nil)
         end
     end)
     -- 按钮状态切换：0=可强化(Submit) / 1=材料不足(Insufficient) / 2=已达上限(Limit)

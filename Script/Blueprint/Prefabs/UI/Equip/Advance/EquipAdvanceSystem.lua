@@ -144,7 +144,18 @@ function S:Spawn(j,itemID,data)
     if self.A:Add(x)~=1 or self.A:Count(x)~=1 then error('CreateFailed') end
     return x
 end
-function S:Rollback(j)
+function S:ChangeCurrency(id,delta,done)
+    local settled=false
+    local function finish(ok,n,reason)
+        if settled then return end; settled=true; done(ok,n,reason)
+    end
+    local ok,err=pcall(function()
+        if self.A.ChangeCurrencyAsync then self.A:ChangeCurrencyAsync(id,delta,finish)
+        else finish(true,self.A:ChangeCurrency(id,delta)) end
+    end)
+    if not ok then finish(false,0,tostring(err)) end
+end
+function S:Rollback(j,done)
     local errors,map={},{}
     local function attempt(label,fn)
         local ok,err=pcall(fn)
@@ -157,7 +168,7 @@ function S:Rollback(j)
             assert(self.A:Count(x)==0,'still present')
         end)
     end
-    if #errors>0 then j.Errors=errors; return false,map end
+    if #errors>0 then j.Errors=errors; done(false,map); return end
     j.Restored=j.Restored or {}
     -- Restore the equipped target first, then materials, so a full backpack fits.
     for _,old in ipairs(j.Originals) do
@@ -173,47 +184,92 @@ function S:Rollback(j)
             map[old.Key]=restored.Key
         end)
     end
-    for _,id in ipairs({C.GoldItemID,C.DiamondItemID}) do
-        attempt('currency:'..id,function()
-            local delta=j.Balances[id]-self.A:Balance(id)
-            if delta~=0 then self.A:ChangeCurrency(id,delta) end
-            assert(self.A:Balance(id)==j.Balances[id],'balance mismatch')
-        end)
+    local ids={C.GoldItemID,C.DiamondItemID}
+    local function restore(index)
+        local id=ids[index]
+        if not id then j.Errors=errors; done(#errors==0,map); return end
+        local read,delta=pcall(function() return j.Balances[id]-self.A:Balance(id) end)
+        if not read then errors[#errors+1]='currency:'..id..':'..tostring(delta); restore(index+1); return end
+        local function check(ok)
+            local valid=pcall(function() assert(ok and self.A:Balance(id)==j.Balances[id],'balance mismatch') end)
+            if not valid then errors[#errors+1]='currency:'..id..':restore failed' end
+            restore(index+1)
+        end
+        if delta==0 then check(true) else self:ChangeCurrency(id,delta,check) end
     end
-    j.Errors=errors
-    return #errors==0,map
+    restore(1)
 end
-function S:Execute(token,request,confirmed)
-    if not self.A:IsServer() then return failure('ClientForbidden') end
-    if not validKey(request) or not validKey(token) then return failure('InvalidRequest') end
+function S:Execute(token,request,confirmed,complete)
+    local delivered
+    local function respond(result)
+        delivered=result; if complete then pcall(complete,result) end; return result
+    end
+    if not self.A:IsServer() then return respond(failure('ClientForbidden')) end
+    if not validKey(request) or not validKey(token) then return respond(failure('InvalidRequest')) end
     local previous=self.Requests[request]
     if previous then
-        if previous.Token~=token then return failure('RequestConflict') end
-        return D.Copy(previous.Result)
+        if previous.Token~=token then return respond(failure('RequestConflict')) end
+        return respond(D.Copy(previous.Result))
     end
-    if self.Blocked then return failure('RecoveryRequired') end
-    if self.Busy then return failure('Busy') end
+    if self.Blocked then return respond(failure('RecoveryRequired')) end
+    if self.Busy then
+        local j=self.Journal
+        if j and j.RequestID==request then
+            if j.Token~=token then return respond(failure('RequestConflict')) end
+            if complete and #j.Waiters<8 then j.Waiters[#j.Waiters+1]=complete end
+            return failure('Pending')
+        end
+        return respond(failure('Busy'))
+    end
     local p=self.Previews[token]
-    if not p then return self:Remember(request,token,failure('PreviewMissing')) end
+    if not p then return respond(self:Remember(request,token,failure('PreviewMissing'))) end
     if self.A:Now()>p.Expires then
-        self.Previews[token]=nil; return self:Remember(request,token,failure('PreviewExpired'))
+        self.Previews[token]=nil; return respond(self:Remember(request,token,failure('PreviewExpired')))
     end
-    if p.RequiresConfirmation and confirmed~=true then return failure('ConfirmationRequired') end
+    if p.RequiresConfirmation and confirmed~=true then return respond(failure('ConfirmationRequired')) end
     local valid,current=pcall(self.Build,self,p.TargetKey,p.MaterialKeys)
-    if not valid then return self:Remember(request,token,failure('ReadFailed')) end
-    if not current.OK then return self:Remember(request,token,current) end
+    if not valid then return respond(self:Remember(request,token,failure('ReadFailed'))) end
+    if not current.OK then return respond(self:Remember(request,token,current)) end
     if current.Signature~=p.Signature or current.NextItemID~=p.NextItemID then
-        return self:Remember(request,token,failure('PreviewStale'))
+        return respond(self:Remember(request,token,failure('PreviewStale')))
     end
     p=current
     self.Busy=true; self.Previews[token]=nil
-    local j={Originals=p.Records,Created={},Balances={},Token=token,RequestID=request}
+    local j={Originals=p.Records,Created={},Balances={},Token=token,RequestID=request,Waiters={}}
     self.Journal=j
-    local ok,output=pcall(function()
+    local finished=false
+    local function finalize(result)
+        if finished then return end; finished=true
+        if j.Begun then pcall(self.A.Finish,self.A) end
+        self.Busy=false; self.Journal=nil
+        result.RefreshPending=not pcall(self.A.Refresh,self.A,p.SlotIdx)
+        self:Remember(request,token,result)
+        respond(result)
+        for _,waiter in ipairs(j.Waiters) do pcall(waiter,D.Copy(result)) end
+    end
+    local function failed(err)
+        local function recovered(restored,map)
+            local result={OK=false,Code=restored and 'TransactionFailed' or 'RecoveryRequired',Detail=tostring(err),RestoredKeys=map}
+            if not restored then
+                self.Blocked=true; self.Recovery=j
+                local saved,saveError=pcall(self.A.RecordRecovery,self.A,j)
+                result.RecoveryRecorded=saved
+                if not saved then result.RecoveryRecordError=tostring(saveError) end
+            end
+            finalize(result)
+        end
+        if not j.Mutated then recovered(true,{})
+        else
+            local called,error=pcall(self.Rollback,self,j,recovered)
+            if not called then j.Errors={tostring(error)}; recovered(false,{}) end
+        end
+    end
+    local data
+    local ok,err=pcall(function()
         j.Balances[C.GoldItemID]=self.A:Balance(C.GoldItemID)
         j.Balances[C.DiamondItemID]=self.A:Balance(C.DiamondItemID)
         assert(self.A:Begin()~=false,'BeginFailed'); j.Begun=true
-        local data=self:MergedData(p)
+        data=self:MergedData(p)
         -- Remove materials first to free space before unequipping the target.
         for i=2,#p.Records do
             local x=p.Records[i]; j.Mutated=true
@@ -223,39 +279,32 @@ function S:Execute(token,request,confirmed)
         if old.EquippedSlot~='' then assert(self.A:Unequip(old)==true,'UnequipFailed') end
         j.Mutated=true
         assert(self.A:Remove(old)==1 and self.A:Count(old)==0,'RemoveTargetFailed')
-        for _,entry in ipairs({{C.GoldItemID,p.Gold},{C.DiamondItemID,p.Diamond}}) do
-            if entry[2]>0 then
-                assert(self.A:ChangeCurrency(entry[1],-entry[2])==entry[2],'CurrencyFailed')
-                assert(self.A:Balance(entry[1])==j.Balances[entry[1]]-entry[2],'CurrencyMismatch')
-            end
-        end
-        local new=self:Spawn(j,p.NextItemID,data)
-        if old.EquippedSlot~='' then assert(self.A:Equip(new,old.EquippedSlot)==true,'EquipFailed') end
-        return new
     end)
-    local result
-    if ok then result={OK=true,Code='Advanced',OldKey=p.TargetKey,NewKey=output.Key,
-        NewItemID=p.NextItemID,RankID=p.NextRankID,Gold=p.Gold,Diamond=p.Diamond}
-    else
-        local restored,map=true,{}
-        if j.Mutated then
-            local rbOK,rb,mapResult=pcall(self.Rollback,self,j)
-            restored=rbOK and rb==true; map=mapResult or {}
-            if not rbOK then j.Errors={tostring(rb)} end
+    if not ok then failed(err); return delivered or failure('Pending') end
+    local fees={{C.GoldItemID,p.Gold},{C.DiamondItemID,p.Diamond}}
+    local function debit(index)
+        local entry=fees[index]
+        if not entry then
+            local spawned,output=pcall(function()
+                local new=self:Spawn(j,p.NextItemID,data); local old=p.Records[1]
+                if old.EquippedSlot~='' then assert(self.A:Equip(new,old.EquippedSlot)==true,'EquipFailed') end
+                return new
+            end)
+            if not spawned then failed(output)
+            else finalize({OK=true,Code='Advanced',OldKey=p.TargetKey,NewKey=output.Key,
+                TargetItemID=p.Records[1].ItemID,NewItemID=p.NextItemID,RankID=p.NextRankID,Gold=p.Gold,Diamond=p.Diamond}) end
+            return
         end
-        result={OK=false,Code=restored and 'TransactionFailed' or 'RecoveryRequired',
-            Detail=tostring(output),RestoredKeys=map}
-        if not restored then
-            self.Blocked=true; self.Recovery=j
-            local saved,saveError=pcall(self.A.RecordRecovery,self.A,j)
-            result.RecoveryRecorded=saved
-            if not saved then result.RecoveryRecordError=tostring(saveError) end
-        end
+        if entry[2]==0 then debit(index+1); return end
+        self:ChangeCurrency(entry[1],-entry[2],function(accepted,n,reason)
+            local checked=pcall(function()
+                assert(accepted and n==entry[2],reason or 'CurrencyFailed')
+                assert(self.A:Balance(entry[1])==j.Balances[entry[1]]-entry[2],'CurrencyMismatch')
+            end)
+            if not checked then failed(reason or 'CurrencyMismatch') else debit(index+1) end
+        end)
     end
-    if j.Begun then pcall(self.A.Finish,self.A) end
-    self.Busy=false; self.Journal=nil
-    local refreshed=pcall(self.A.Refresh,self.A,p.SlotIdx)
-    result.RefreshPending=not refreshed
-    return self:Remember(request,token,result)
+    debit(1)
+    return delivered or failure('Pending')
 end
 return S

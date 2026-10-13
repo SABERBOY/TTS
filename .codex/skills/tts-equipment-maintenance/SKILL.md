@@ -1,6 +1,6 @@
 ---
 name: tts-equipment-maintenance
-description: 维护 Oasis Era UGC 的 TTS 装备升阶模块。用于调整 EquipAdvanceRank/Rule/Item 表、补装备阶段路线、修改 EquipAdvance 配置读取或实例事务、GM 批量测试、升阶 UI 接入，以及诊断 LuaCheck、Asset 路径、TableStruct userdata、账本和补偿问题。保持相同 ItemID 合成、品质与阶位分离及 UGC Lua 限制；不用于无关项目的通用装备系统。
+description: 维护 Oasis Era UGC 的 TTS 装备强化与升阶。用于调整 EquipAdvanceRank/Rule/Item 表、UGCObject虚拟货币与VirtualItemManager、实例异步事务、GM批量测试、装备UI及LuaCheck排错。保持相同ItemID合成、品质与阶位分离及UGC Lua限制；不用于无关项目的通用装备系统。
 ---
 
 # TTS 装备维护
@@ -23,6 +23,7 @@ description: 维护 Oasis Era UGC 的 TTS 装备升阶模块。用于调整 Equi
 | 账本/保护/复制 | Advance/EquipAdvanceData.lua |
 | 预览/幂等/执行/补偿 | Advance/EquipAdvanceSystem.lua |
 | 背包/货币/穿戴/档案适配 | Advance/EquipAdvanceRuntime.lua |
+| 虚拟货币/共享互斥/强化扣款 | EquipCurrency.lua、EquipStrengthenTransaction.lua、EquipSlotSystem.lua + UE UGCObject/GameMode |
 | 快捷测试包/每点一次合成 | Advance/EquipAdvanceGM.lua + Script/utils/gm.lua |
 | UI选择/确认/布局/生命周期 | Advance/EquipAdvanceViewModel.lua、EquipAdvanceUIRender.lua、UIBP/Game_Equip_Develop_Transform_UIBP.lua |
 | UI快照/RPC | Advance/EquipAdvanceClient.lua、EquipAdvanceRPC.lua、EquipAdvanceRuntime.lua、UGCPlayerController.lua |
@@ -30,6 +31,8 @@ description: 维护 Oasis Era UGC 的 TTS 装备升阶模块。用于调整 Equi
 `Advance` 始终位于 `Script/Blueprint/Prefabs/UI/Equip`。按最小范围修改，保留原强化经济与装备蓝图技能。UE操作前读[原生表维护参考](references/ue-tables.md)；测试与LuaCheck读[验证参考](references/verification.md)。
 
 UI维护先读[升阶UI参考](references/ui.md)，完整人类交接文档为项目 `Docs/equipment-advance-ui.md`。玩家入口是养成→升阶，内部PageId仍为transform。
+
+货币和收支维护先读[虚拟货币参考](references/currency.md)，完整交接文档为项目 `Docs/equipment-virtual-currency.md`。当前金币1001、钻石1002来自UGCObject与官方VirtualItemManager；不能回退到UGCBattleItem/背包余额。
 
 ## 必须保留的约定
 
@@ -40,6 +43,7 @@ UI维护先读[升阶UI参考](references/ui.md)，完整人类交接文档为�
 - 原生实例身份用BackpackUtils.GetItemInstanceID；不是ItemID，也不依赖DefineID.InstanceID反射。
 - 保留目标完整CustomData及保护、累计投入；检查512字节限制。普通自动选材排除历史投入且只用于低阶。GM快捷确认例外不应用到玩家自动流程。
 - Guard只限制事务生成实例自动穿戴；不改装备蓝图全局CDO。补偿后实例Key可能变化，使用RestoredKeys刷新。
+- RemoveItem必须等待官方回调，Pending保留共享锁和Journal；两个扣款完成后才生成输出。同token/request重试等待同一笔，不能超时解锁重扣。强化、升阶、GM复用同一Currency网关；恢复档案阻断所有这些写操作。
 - RecoveryRequired保持阻断和记录；不能清记录假装修复。保存API成功不证明跨对局落盘，不声称跨进程原子性。
 - UI价格展示来自同一份表，但启用提交必须等待关联的服务端预览；紫阶及以上手动材料和二次确认。提交超时沿用原token/request，旧Confirm不是重试接口。
 
