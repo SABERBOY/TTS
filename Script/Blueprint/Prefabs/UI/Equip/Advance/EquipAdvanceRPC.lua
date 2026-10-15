@@ -15,6 +15,13 @@ local function reply(pc,kind,fn,context)
     end
     return send(pc,kind,result,context)
 end
+local function first(items,limit)
+    local out={}
+    for index=1,math.min(limit,#items) do out[index]=items[index] end
+    return out
+end
+-- 升阶面板不再请求整包快照（改由客户端 EquipAdvanceLocalBag 本地读背包）。
+-- 这条路径只保留给 GM/调试，行数由 Runtime 的上限截断，避免大背包把 RPC 打爆。
 function RPC.Snapshot(pc,context)
     return reply(pc,'Snapshot',function() return R.UISnapshot(pc) end,context)
 end
@@ -22,7 +29,12 @@ function RPC.Preview(pc,target,materials,context)
     return reply(pc,'Preview',function()
         local s=R.GetService(pc)
         local result=s:Preview(target,materials)
-        if result.Code=='ManualMaterialsRequired' or result.OK then result.Candidates=s:Candidates(target) end
+        if result.Code=='ManualMaterialsRequired' or result.OK then
+            -- 候选材料与背包同量级，只回传前若干件并给出总数。
+            local candidates=s:Candidates(target)
+            result.CandidateTotal=#candidates
+            result.Candidates=first(candidates,32)
+        end
         return result
     end,context)
 end

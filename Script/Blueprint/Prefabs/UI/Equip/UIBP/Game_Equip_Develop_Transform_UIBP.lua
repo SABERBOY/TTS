@@ -24,11 +24,18 @@
 ---@field TextBlock_Status UTextBlock
 ---@field TextBlock_TargetName UTextBlock
 --Edit Below--
+---装备升阶面板。背包物品来源与"装备预览页/槽位强化页"完全一致：
+---  EquipSlotSystem.CollectBagEquipItems(PC) 在客户端本地读取，不再向服务端请求整包快照。
+---  旧流程每秒把整个背包序列化进一条 Client_EquipAdvanceResult，背包一大就超出 RPC 传输上限并崩溃。
+---  升阶事务仍由服务端权威校验：Preview/Commit 只传实例 Key，负载与背包大小无关。
 local C=require('Script.Blueprint.Prefabs.UI.Equip.Advance.EquipAdvanceConfig')
 local Client=require('Script.Blueprint.Prefabs.UI.Equip.Advance.EquipAdvanceClient')
 local Model=require('Script.Blueprint.Prefabs.UI.Equip.Advance.EquipAdvanceViewModel')
 local UI=require('Script.Blueprint.Prefabs.UI.Equip.Advance.EquipAdvanceUIRender')
+local Bag=require('Script.Blueprint.Prefabs.UI.Equip.Advance.EquipAdvanceLocalBag')
+local System=require('Script.Blueprint.Prefabs.UI.Equip.EquipSlotSystem')
 local Panel={}
+local BAG_INTERVAL=2
 function Panel:Construct()
     -- NewButton delegates are not ready during Construct. Bind only in InitData.
     self.Active=false
@@ -36,6 +43,7 @@ end
 function Panel:InitData(params)
     self.InParams=params or {}; self.Model=self.Model or Model.New(); self.Active=true
     if not self.Model.CommitRequest then self.Model.Snapshot=nil end
+    self.BagAt=nil
     self.Bindings=self.Bindings or {}; self.RowData=self.RowData or {}
     self.TextBlock_Grade.Slot:SetSize({SizeRule=1,Value=1})
     self.TextBlock_Grade:SetJustification(1)
@@ -60,6 +68,8 @@ function Panel:InitData(params)
     Client.Subscribe(self,function(result)
         if weak:IsValid() then weak:Get():OnResult(result) end
     end)
+    -- 穿戴/挂载变化即时反映到本地背包列表（与装备预览页同一委托，绑定幂等）
+    System.BindAttachChange(self,function(SelfRef) SelfRef:RequestSnapshot(true) end)
     if not self.Timer then
         local pc=UGCGameSystem.GetLocalPlayerController()
         self.TimerOwner=pc
@@ -67,7 +77,7 @@ function Panel:InitData(params)
             if weak:IsValid() then weak:Get():Poll() end
         end,1,true)
     end
-    self:RequestSnapshot(); self:Render()
+    self:RequestSnapshot(true)
 end
 function Panel:Bind(delegate,fn)
     delegate:Add(fn,self); self.Bindings[#self.Bindings+1]={Delegate=delegate,Fn=fn}
@@ -75,7 +85,7 @@ end
 function Panel:Deactivate()
     self.Active=false; Client.Unsubscribe(self)
     if self.Timer then UGCGameSystem.ClearTimer(self.TimerOwner,self.Timer); self.Timer=nil end
-    self.SnapshotRequest=nil
+    self.BagAt=nil
     if self.Model and not self.Model.CommitRequest then self.Model:Invalidate() end
 end
 function Panel:Destruct()
@@ -83,17 +93,29 @@ function Panel:Destruct()
     for _,binding in ipairs(self.Bindings or {}) do binding.Delegate:Remove(binding.Fn,self) end
     self.Bindings={}; self.Bound=false; self.RowData={}
 end
-function Panel:RequestSnapshot()
-    if not self.Active or self.SnapshotRequest then return end
-    self.SnapshotRequest=Client.NewRequestID(); self.SnapshotAt=os.time()
-    Client.Snapshot(self.SnapshotRequest)
+---本地读取背包（与预览页/强化页同一套 CollectBagEquipItems），同步完成，无整包 RPC。
+---@param force boolean|nil 忽略节流间隔，立即重读
+function Panel:RequestSnapshot(force)
+    if not self.Active then return end
+    local now=os.time()
+    if not force and self.BagAt and now-self.BagAt<BAG_INTERVAL then return end
+    self.BagAt=now
+    local ok,result=pcall(Bag.Collect,UGCGameSystem.GetLocalPlayerController())
+    local snapshot=result
+    if not ok then
+        print('[EquipAdvance] 本地背包读取失败: '..tostring(result))
+        snapshot={OK=false,Code='ReadFailed',Items={},Levels={}}
+    end
+    local m=self.Model
+    local changed=m:ApplySnapshot(snapshot)
+    if changed or (not m.Preview and not m.PreviewRequest and not m.CommitRequest) then
+        if snapshot.OK then self:RequestPreview() else self:Render() end
+    end
+    return changed
 end
 function Panel:Poll()
     if not self.Active then return end
     local now=os.time(); local m=self.Model
-    if self.SnapshotRequest and now-self.SnapshotAt>8 then
-        self.SnapshotRequest=nil; m:Invalidate(); m.Code='ReadFailed'; self:Render()
-    end
     if m.CommitRequest then
         if now-m.CommitAt>8 then m.Code='Timeout'; self:Render() end
         return
@@ -115,16 +137,11 @@ end
 function Panel:OnResult(result)
     if not self.Active then return end
     local m=self.Model
-    if result.Kind=='Snapshot' and self.SnapshotRequest and result.ClientRequestID==self.SnapshotRequest then
-        self.SnapshotRequest=nil
-        local changed=m:ApplySnapshot(result)
-        if changed or (not m.Preview and not m.PreviewRequest and not m.CommitRequest) then
-            if result.OK then self:RequestPreview() else self:Render() end
-        end
-    elseif result.Kind=='Preview' and m:AcceptPreview(result,os.time()) then
+    -- 背包不再经服务端快照回传；这里只接受预览与提交两类结果（Snapshot 只可能来自 GM 调试）。
+    if result.Kind=='Preview' and m:AcceptPreview(result,os.time()) then
         self:Render()
     elseif result.Kind=='Commit' and m:AcceptCommit(result) then
-        self.SnapshotRequest=nil; self:RequestSnapshot(); self:Render()
+        self:RequestSnapshot(true)
     end
 end
 function Panel:OnMode()
@@ -210,5 +227,5 @@ function Panel:Render()
     end
     if m.Snapshot and #self.DisplayItems==0 and not target then UI.Text(self.TextBlock_Status,'背包中没有装备，可获取装备后再来升阶') end
 end
-function Panel:Refresh() self:RequestSnapshot() end
+function Panel:Refresh() self:RequestSnapshot(true) end
 return Panel

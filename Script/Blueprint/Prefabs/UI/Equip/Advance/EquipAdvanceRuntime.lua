@@ -143,9 +143,15 @@ function R.GetService(pc)
     return service
 end
 function R.Release(pc) R.Services[pc]=nil end
+-- 单条 RPC 能安全容纳的快照行数上限。升阶面板已改为客户端本地读背包
+-- （EquipAdvanceLocalBag），这个投影只留给 GM/调试；背包远多于上限时截断，
+-- 不能把整个背包塞进一条 Client_EquipAdvanceResult——大背包会直接崩溃。
+local RPC_ROW_LIMIT=120
 -- Read-only player UI snapshot. No GM permission and no client-supplied prices.
-function R.UISnapshot(pc)
+function R.UISnapshot(pc,maxRows)
     local s=R.GetService(pc); local a=s.A
+    local limit=math.floor(tonumber(maxRows) or RPC_ROW_LIMIT)
+    if limit<1 then limit=1 elseif limit>RPC_ROW_LIMIT then limit=RPC_ROW_LIMIT end
     local records=a:List(); local seen={}
     for _,x in ipairs(records) do seen[x.Key]=true end
     -- Show legacy wearable equipment too; it is explicitly unsupported for advancement.
@@ -157,21 +163,17 @@ function R.UISnapshot(pc)
     end
     table.sort(records,function(x,y) return x.Key<y.Key end)
     local result={OK=true,Code='Snapshot',Items={},Levels={},Blocked=s.Blocked==true,
-        GoldHave=a:Balance(C.GoldItemID),DiamondHave=a:Balance(C.DiamondItemID)}
+        GoldHave=a:Balance(C.GoldItemID),DiamondHave=a:Balance(C.DiamondItemID),RowCount=#records}
     for i=1,6 do result.Levels[i]=a:SlotLevel(i) end
     local signatures={}
-    for _,x in ipairs(records) do
-        local cfg=C.Items[x.ItemID]; local state=x.CustomData.EquipAdvance
-        if type(state)~='table' then state={} end
-        local valid=D.ValidState(x.CustomData) and x.Count==1 and (x.CustomDataSize or 0)<=512
-        signatures[#signatures+1]={x.Key,x.ItemID,x.CustomData,x.Count,x.EquippedSlot,x.Attached,x.CustomDataSize}
-        result.Items[#result.Items+1]={Key=x.Key,ItemID=x.ItemID,EquippedSlot=x.EquippedSlot,
-            SlotIdx=cfg and cfg.SlotIdx or 0,RankOrder=cfg and cfg.RankOrder or 0,
-            AllowedMaterial=valid and not D.IsProtected(x) and true or false,
-            SafeAuto=valid and D.IsSafeAutoMaterial(x) and true or false,
-            Locked=state.Locked==true or x.CustomData.Locked==true,
-            HasInvestment=valid and ((state.Gold or 0)>0 or (state.Diamond or 0)>0 or (state.MaterialParts or 0)>0) or false}
+    for index,x in ipairs(records) do
+        local row=D.ProjectRow(x,C.Items[x.ItemID])
+        -- 指纹覆盖全部行，回传只取前 limit 行；否则每次轮询的行数差异会伪造出 Revision 变化。
+        signatures[#signatures+1]={row.Key,row.ItemID,row.SlotIdx,row.RankOrder,row.EquippedSlot,
+            x.Count,x.Attached,x.CustomDataSize,row.AllowedMaterial,row.SafeAuto,row.Locked,row.HasInvestment}
+        if index<=limit then result.Items[index]=row end
     end
+    result.Truncated=#records>limit
     local fingerprint=D.Fingerprint({signatures,result.Levels,result.GoldHave,result.DiamondHave,result.Blocked})
     if fingerprint~=s.UIFingerprint then s.UIFingerprint=fingerprint; s.UIRevision=(s.UIRevision or 0)+1 end
     result.Revision=s.UIRevision

@@ -42,6 +42,8 @@ local function call(name,...)
     if pc then UnrealNetwork.CallUnrealRPC(pc,pc,name,...) end
 end
 function M.Preview(target,materials) call('ServerRPC_EquipAdvancePreview',target,materials) end
+-- 调试/GM 专用：升阶面板的背包改由 EquipAdvanceLocalBag 在本地读取，不再走这条整包快照。
+-- 服务端回传行数有上限（Runtime.RPC_ROW_LIMIT），大背包时只返回前若干件并标记 Truncated。
 function M.Snapshot(request) call('ServerRPC_EquipAdvanceSnapshot',request) end
 function M.PreviewForUI(target,materials,request) call('ServerRPC_EquipAdvancePreview',target,materials,request) end
 function M.CommitForUI(token,request,confirmed) call('ServerRPC_EquipAdvanceCommit',token,request,confirmed==true) end

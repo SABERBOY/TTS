@@ -145,7 +145,7 @@
 python Tests/run_equipment_tests.py
 ```
 
-依赖Python的 `lupa.lua51`。2026-09-30基线共64组：17组配置+27组业务（保留原23组）+9组UI状态+6组虚拟货币+5组强化事务，以及逐字段快照比较。运行器在宿主Python读取文件，再执行Lua；项目Lua内不自行读文件。若Python环境不匹配，先确认当前Python和Lupa安装，不在游戏脚本中加入临时加载器。
+依赖Python的 `lupa.lua51`。2026-10-13基线共71组：17组配置+27组业务（保留原23组）+9组UI状态+6组虚拟货币+5组强化事务+7组升阶本地背包读取（`Tests/EquipAdvanceLocalBagTests.lua`，原生接口用桩），以及逐字段快照比较。运行器在宿主Python读取文件，再执行Lua；项目Lua内不自行读文件。运行器还对源码做静态断言：升阶面板不得再出现 `Client.Snapshot`，本地背包模块不得出现 `UnrealNetwork`/`CallUnrealRPC`，且必须使用 `System.CollectBagEquipItems`。若Python环境不匹配，先确认当前Python和Lupa安装，不在游戏脚本中加入临时加载器。
 
 此测试验证规则和适配器故障处理，不能代替原生 userdata、真实背包、RPC或持久化验收。
 
@@ -204,6 +204,8 @@ DS通过之后，客户端执行GM自检和一次预览/确认，检查回调、
 | require Tests返回nil | Tests不在运行模块打包路径 | 使用官方控制台的显式字面测试代码，禁止游戏文件装载 |
 | GM不执行或无回调 | 服务端GM开关、角色/控制台注册、Controller RPC | 等就绪后验证权限和RPC，不绕过服务端检查 |
 | 属性没变/重复加成 | 完整实例快照、旧装备卸下、新装备原槽位与刷新 | 检查EquipSlotAttrApplier及原生穿戴状态 |
+| 打开升阶页后客户端掉线、DS报 `SendLuaNetworkRemoteContent Failed: writer IsError()` | 是否有把整份背包列表塞进一条 RPC（旧 `Client_EquipAdvanceResult` 快照即此问题） | 背包列表走客户端本地 `EquipAdvanceLocalBag`/`CollectBagEquipItems`；RPC 只传 Key，调试快照行数受 `RPC_ROW_LIMIT` 限制 |
+| 大背包下列表不刷新或刷新偏慢 | 本地读取节流（`BAG_INTERVAL`）与 Attach 委托是否绑定成功 | 保持节流并在事件上用 `RequestSnapshot(true)`，不要改成逐帧全量读 |
 | TransactionFailed | 逐步返回值、补偿结果 | 按RestoredKeys刷新引用，再次预览 |
 | RecoveryRequired | 记录、余额、生成输出与补回输入 | 保留阻断并人工核对，不能清记录后盲目重试 |
 | 日志只有第一个参数 | 原生print参数行为 | 用字符串拼接或string.format输出单字符串 |
@@ -218,7 +220,7 @@ DS通过之后，客户端执行GM自检和一次预览/确认，检查回调、
 
 ## 10. 升阶 UI 维护
 
-已接入装备主界面的“养成 → 升阶”，PageId仍为transform。完整操作与代码定位见[升阶UI维护](equipment-advance-ui.md)。通过只读Snapshot刷新装备实例，再用PreviewForUI/CommitForUI和ClientRequestID匹配回复；价格与下一阶段由服务端决定。
+已接入装备主界面的“养成 → 升阶”，PageId仍为transform。完整操作与代码定位见[升阶UI维护](equipment-advance-ui.md)。装备实例由客户端本地读取（`EquipAdvanceLocalBag` → `EquipSlotSystem.CollectBagEquipItems`，与装备预览页/槽位强化页同一入口），再用PreviewForUI/CommitForUI和ClientRequestID匹配回复；价格、材料与下一阶段仍由服务端决定。**不要把整份背包快照塞回一条 RPC**：2026-10-13 大背包实测下 `Client_EquipAdvanceResult` 序列化直接 `writer IsError()`，客户端随后 `ConnectionLongTimeNoReceived` 掉线。GM/调试用的 `Client.Snapshot` 保留，但回传行数被 `Runtime.RPC_ROW_LIMIT` 截断。
 
 紫阶以上手动选择相同ID材料并二次确认。110秒客户端预览过期会重做；提交8秒未回包可重试相同token/request。成功/补偿后刷新实例引用。旧Confirm仍供GM使用，每次生成新编号，不能用于网络重试。
 

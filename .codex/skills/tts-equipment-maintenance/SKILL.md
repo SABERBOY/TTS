@@ -26,7 +26,8 @@ description: 维护 Oasis Era UGC 的 TTS 装备强化与升阶。用于调整 E
 | 虚拟货币/共享互斥/强化扣款 | EquipCurrency.lua、EquipStrengthenTransaction.lua、EquipSlotSystem.lua + UE UGCObject/GameMode |
 | 快捷测试包/每点一次合成 | Advance/EquipAdvanceGM.lua + Script/utils/gm.lua |
 | UI选择/确认/布局/生命周期 | Advance/EquipAdvanceViewModel.lua、EquipAdvanceUIRender.lua、UIBP/Game_Equip_Develop_Transform_UIBP.lua |
-| UI快照/RPC | Advance/EquipAdvanceClient.lua、EquipAdvanceRPC.lua、EquipAdvanceRuntime.lua、UGCPlayerController.lua |
+| 升阶背包读取（客户端本地） | Advance/EquipAdvanceLocalBag.lua + EquipSlotSystem.CollectBagEquipItems |
+| 调试快照/RPC | Advance/EquipAdvanceClient.lua、EquipAdvanceRPC.lua、EquipAdvanceRuntime.lua、UGCPlayerController.lua |
 
 `Advance` 始终位于 `Script/Blueprint/Prefabs/UI/Equip`。按最小范围修改，保留原强化经济与装备蓝图技能。UE操作前读[原生表维护参考](references/ue-tables.md)；测试与LuaCheck读[验证参考](references/verification.md)。
 
@@ -46,6 +47,7 @@ UI维护先读[升阶UI参考](references/ui.md)，完整人类交接文档为�
 - RemoveItem必须等待官方回调，Pending保留共享锁和Journal；两个扣款完成后才生成输出。同token/request重试等待同一笔，不能超时解锁重扣。强化、升阶、GM复用同一Currency网关；恢复档案阻断所有这些写操作。
 - RecoveryRequired保持阻断和记录；不能清记录假装修复。保存API成功不证明跨对局落盘，不声称跨进程原子性。
 - UI价格展示来自同一份表，但启用提交必须等待关联的服务端预览；紫阶及以上手动材料和二次确认。提交超时沿用原token/request，旧Confirm不是重试接口。
+- 升阶的背包列表必须与装备预览页/槽位强化页同源：客户端本地 `EquipSlotSystem.CollectBagEquipItems`（`EquipAdvanceLocalBag`）。不能把整份背包列表塞进一条 RPC——2026-10-13 大背包实测 DS 回 `Client_EquipAdvanceResult` 时 `writer IsError()`，客户端 `ConnectionLongTimeNoReceived` 掉线。RPC 只传实例 Key 与少量字段；GM 调试快照受 `Runtime.RPC_ROW_LIMIT` 行数上限约束。
 
 ## 工作闭环
 

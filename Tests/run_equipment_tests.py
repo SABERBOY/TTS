@@ -28,6 +28,18 @@ lua.execute(Path('Tests/EquipAdvanceTests.lua').read_text(encoding='utf-8-sig'))
 lua.execute(Path('Tests/EquipAdvanceUITests.lua').read_text(encoding='utf-8-sig')).Run()
 lua.execute(Path('Tests/EquipCurrencyTests.lua').read_text(encoding='utf-8-sig')).Run()
 lua.execute(Path('Tests/EquipStrengthenTransactionTests.lua').read_text(encoding='utf-8-sig')).Run()
+# Local bag reads install native stubs, so this group runs last in the shared VM.
+lua.execute(Path('Tests/EquipAdvanceLocalBagTests.lua').read_text(encoding='utf-8-sig')).Run()
+UI_DIR = Path('Script/Blueprint/Prefabs/UI/Equip')
+panel = (UI_DIR / 'UIBP/Game_Equip_Develop_Transform_UIBP.lua').read_text(encoding='utf-8-sig')
+local_bag = (UI_DIR / 'Advance/EquipAdvanceLocalBag.lua').read_text(encoding='utf-8-sig')
+# 升阶背包必须与预览页/强化页同源，且不得再把整包数据塞进 RPC。
+assert 'EquipSlotSystem.CollectBagEquipItems' in (UI_DIR / 'UIBP/Game_Equip_Develop_Strengthen_UIBP.lua').read_text(encoding='utf-8-sig')
+assert 'System.CollectBagEquipItems' in local_bag
+assert 'Client.Snapshot' not in panel and 'ServerRPC_EquipAdvanceSnapshot' not in panel
+assert 'EquipAdvanceLocalBag' in panel
+assert 'CallUnrealRPC' not in local_bag and 'UnrealNetwork' not in local_bag
+print('Advancement bag read is local (CollectBagEquipItems) with no snapshot RPC')
 config = lua.eval("require('Script.Blueprint.Prefabs.UI.Equip.Advance.EquipAdvanceConfig')")
 orders = {row['RankID']: row['Order'] for row in fixture['EquipAdvanceRank']}
 for row in fixture['EquipAdvanceRank']:

@@ -158,3 +158,47 @@ Final session readback:
 11:57:00.985 DS [VirtualLast]: GM native return check OK=true added=100000,1000.
 11:57:00.987 DS [VirtualLast]: cleanup=true gold=0 diamond=0.
 Final session was stopped after explicit cleanup readback. Git diff whitespace checks passed for modified code/docs/tests.
+
+Advancement bag read moved on-client 2026-10-13
+Reported issue: opening 装备升阶 with many bag items errors/disconnects; 装备预览页 and 槽位强化页 read the bag fine.
+Root cause, from the user's own session _dkfffq3lga16iq (client 2026.10.13-18.16.59 / ds 2026.10.13-18.18.54):
+18:20:35.756 client SerializeAndSend ServerRPC_EquipAdvanceSnapshot Size: 50  (request stays tiny)
+18:20:36.245 ds SendLuaNetworkRemoteContent Failed: writer IsError() == TRUE after serializing ... Client_EquipAdvanceResult
+18:20:40.799 client OnUnrealNetworkLost FromClient / ConnectionLongTimeNoReceived; the panel re-sent the bulk request every 8s.
+The bulk snapshot is the only payload that scales with the bag; the two working pages never use it, they read
+EquipSlotSystem.CollectBagEquipItems(PC) locally.
+
+Change: Advance/EquipAdvanceLocalBag.lua reads the bag locally through that same collector. The panel no longer issues
+the snapshot RPC. EquipAdvanceData.ProjectRow is now the single row projection shared by client and UISnapshot.
+Runtime.UISnapshot (GM/debug only) caps returned rows at RPC_ROW_LIMIT=120 with Truncated/RowCount; RPC.Preview caps
+Candidates at 32 with CandidateTotal. Preview/Commit stay server-authoritative and only carry instance keys.
+
+Pure Lua: python -X utf8 Tests/run_equipment_tests.py -> 71 cases (17 config + 27 business + 9 UI + 7 local bag
++ 6 currency + 5 strengthen transaction), plus runner static asserts (panel has no Client.Snapshot, local module has no
+UnrealNetwork/CallUnrealRPC, both use CollectBagEquipItems) and the field-by-field table snapshot comparison.
+
+Editor LuaCheck: 21:04:22.275 LogUGCPIEFlowLog "PIE debug: lua file validation passed", staged list includes
+Script/Blueprint/Prefabs/UI/Equip/Advance/EquipAdvanceLocalBag.lua. The "Actor Lua file ... can't find correspond
+Bluepirint" warning fires for every pure helper module (BossAI_*, Skill_Utils, ...) and is pre-existing/normal.
+
+PIE A/B, session _dkfffq3lga69eo (one client + DS, bag 80 items / 41 wearable equipment rows):
+20:58:43 client [VERIFY] localbag ok=true rows=41 revision=1      -> panel opened, zero snapshot rpc, no net failure
+20:59:42 client [VERIFY] B bagRaw=80 collectorRows=41 localBagRows=41 -> local read equals the two working pages
+20:59:42 client [VERIFY] C panel=true active=true displayRows=41 code=SelectTarget items=41
+21:00:33 ds SendLuaNetworkRemoteContent Failed ... Client_EquipAdvanceResult  (deliberate legacy Client.Snapshot probe)
+21:00:37 client NetworkFailure ConnectionLongTimeNoReceived       -> original failure reproduced at only 41 rows
+
+PIE transaction, session _dkfffq3lga6hjv (one client + DS):
+21:08 client [VERIFY] N1 rows=27 gold=200000 diamond=2000 levels=180/180/180/180/180/180  (all read locally)
+                 N2 picked=831:8310128:94 need=1 -> N3 code=Ready mats=1 can=true
+                 [EquipAdvance] Preview Ready OK=true ; [EquipAdvance] Commit Advanced OK=true
+                 N5 notice=升阶成功 noticeOK=true rows 27->26 ; N6 target=831:8310127:133 localRows=26 display=26
+                 -> product auto-selected from the next local read; snapshot rpc 0, netfail 0
+Cleanup on DS: removed=56 GM items, gold 199900->0, diamond 2000->0, six slot levels back to 1;
+client readback [VERIFY] Z rows=0 gold=0 diamond=0 revision=6. Session stopped after cleanup readback.
+
+Boundaries not covered this round: a single PIE bag only reaches ~80 items (capacity), so a several-hundred-row bag was
+not stacked live - the bulk RPC already failed at 41 rows, so the mechanism is proven, not the extreme size.
+Manual-material (purple+) second-click confirm flow was not re-driven live this round; it is offline-covered and its
+transport is unchanged. Multi-client, reconnect, cross-process persistence and GM debug-snapshot truncation visuals
+remain unverified.

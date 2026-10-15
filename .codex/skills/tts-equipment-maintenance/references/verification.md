@@ -4,7 +4,7 @@
 
 ## 离线与导入检查
 
-项目根运行 `python -X utf8 Tests/run_equipment_tests.py`。依赖lupa.lua51，当前64组：17组配置、27组业务、9组UI、6组虚拟货币、5组强化事务及所有规范化字段一致。Runner用宿主Python读源文件/JSON；Lua内不读文件。UI原生fixture与交互维护见[UI参考](ui.md)。
+项目根运行 `python -X utf8 Tests/run_equipment_tests.py`。依赖lupa.lua51，当前71组：17组配置、27组业务、9组UI、7组升阶本地背包读取（`Tests/EquipAdvanceLocalBagTests.lua`，桩掉原生背包/物品/属性/货币接口，断言零 RPC）、6组虚拟货币、5组强化事务及所有规范化字段一致。Runner用宿主Python读源文件/JSON；Lua内不读文件。运行器另有静态断言：升阶面板不出现 `Client.Snapshot`，本地背包模块不出现 `UnrealNetwork`/`CallUnrealRPC`，且必须走 `CollectBagEquipItems`。UI原生fixture与交互维护见[UI参考](ui.md)。
 
 Lua测试导入只能返回模块。修改后确认导入没有调用原生表、执行测试或修改背包。普通Lua语法编译只是一层检查；真实编辑器LuaCheck必须有明确passed日志，check.json更新并非检查通过。
 

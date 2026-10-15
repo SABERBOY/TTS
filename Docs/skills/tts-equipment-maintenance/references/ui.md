@@ -7,7 +7,8 @@ UI已接入，不要再新建另一套独立装备入口。先读项目 `Docs/eq
 - 费用/门槛/路线：改表、保存、重启PIE；不要在Panel或ViewModel写配方常量。
 - 自动选择、确认、状态文案：EquipAdvanceViewModel；保留相同ItemID、精确实例和低阶安全自动规则。未知Viewed不自动填，GM快捷规则不能移入玩家UI。
 - 面板行为：Transform脚本。物品行：Game_Equip_Advance_Row_UIBP。原生布局只改对应两个项目资产，不改共享模板影响强化页。
-- 快照：Runtime.UISnapshot是只读投影；指纹用稳定实例Key/数据，不包含每次创建的DefineID userdata地址。否则轮询会持续取消预览/确认。
+- 背包读取：`Advance/EquipAdvanceLocalBag.lua` 在客户端本地调用 `EquipSlotSystem.CollectBagEquipItems`，与装备预览页/槽位强化页同一入口，行数再多也不过 RPC。行投影统一走 `EquipAdvanceData.ProjectRow`，服务端 `Runtime.UISnapshot`（现仅 GM/调试，回传受 `RPC_ROW_LIMIT` 截断）用同一口径，避免两端规则漂移。指纹只用稳定实例 Key/投影字段，不含每次新建的 DefineID userdata 地址，否则轮询会持续取消预览/确认。
+- 整包快照禁止回流：2026-10-13 实测 41 件装备的 `Client_EquipAdvanceResult` 就 `writer IsError()`，客户端 `ConnectionLongTimeNoReceived` 掉线。需要新字段时加进 ProjectRow，不要恢复服务端整包回传。
 - 回包：ClientRequestID必须匹配等待请求，旧预览/GM结果不能启用当前按钮。8秒超时重试原token/request，110秒预览过期重做。
 - 生命周期：InitData绑定原生委托，Deactivate释放timer/订阅，Destruct解绑；主界面切页和关闭必须调用Deactivate。不要在Construct绑定NewButton。
 - 滚动复用：OnUpdateItem原生索引从0开始；点击读取当前AdvanceData。异步图标用弱引用与请求序号防串图。

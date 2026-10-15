@@ -1,6 +1,6 @@
 # 装备升阶 UI 实施与维护
 
-更新：2026-09-30。本文对应现有 `Game_Equip_Develop_Transform_UIBP` 的升阶接入。基础规则、事务与三张配置表见[系统说明](equipment-advance-system.md)，改表流程见[维护手册](equipment-advance-maintenance.md)。所有相对路径以 TTS 项目根为准。
+更新：2026-10-13（背包改为客户端本地读取；原版接入说明见下文各节）。本文对应现有 `Game_Equip_Develop_Transform_UIBP` 的升阶接入。基础规则、事务与三张配置表见[系统说明](equipment-advance-system.md)，改表流程见[维护手册](equipment-advance-maintenance.md)。所有相对路径以 TTS 项目根为准。
 
 ## 1. 玩家入口和行为
 
@@ -29,16 +29,18 @@ require('Script.Blueprint.Prefabs.UI.Equip.EquipPanelManager').Open({PageId='tra
 
 | 文件 | 维护内容 |
 |---|---|
-| `UIBP/Game_Equip_Develop_Transform_UIBP.lua` | 生命周期、按钮/材料点击、快照轮询、列表刷新、界面文案 |
+| `UIBP/Game_Equip_Develop_Transform_UIBP.lua` | 生命周期、按钮/材料点击、本地背包轮询读取、列表刷新、界面文案 |
 | `Item/Game_Equip_Advance_Row_UIBP.lua` | 动态列表每行展示与实例点击；复用时替换 AdvanceData |
+| `Advance/EquipAdvanceLocalBag.lua` | 升阶的取背包入口：本地调用 `EquipSlotSystem.CollectBagEquipItems`，产出与 UISnapshot 同形状的只读快照 |
 | `Advance/EquipAdvanceViewModel.lua` | 纯Lua选择状态、自动/手动材料、确认、预览有效期、请求匹配、新实例与补偿引用 |
 | `Advance/EquipAdvanceUIRender.lua` | 图标异步加载、原生品质边框、货币与控件可见性 |
-| `Advance/EquipAdvanceClient.lua` | Snapshot/PreviewForUI/CommitForUI、请求编号、多订阅分发；兼容GM旧入口 |
-| `Advance/EquipAdvanceRPC.lua` | 回传 ClientRequestID，包括错误结果 |
-| `Advance/EquipAdvanceRuntime.lua` | UISnapshot只读投影；实际事务仍由既有System负责 |
+| `Advance/EquipAdvanceData.lua` | `ProjectRow` 是行投影的唯一口径，服务端与本地快照共用；账本校验/保护规则也在此 |
+| `Advance/EquipAdvanceClient.lua` | PreviewForUI/CommitForUI、请求编号、多订阅分发；Snapshot 只留 GM/调试 |
+| `Advance/EquipAdvanceRPC.lua` | 回传 ClientRequestID，包括错误结果；预览候选材料截断后再回传 |
+| `Advance/EquipAdvanceRuntime.lua` | UISnapshot只读投影（GM/调试用，行数有上限）；实际事务仍由既有System负责 |
 | `UIBP/Game_Equip_Main_UIBP.lua` / `EquipPanelManager.lua` | 切页、关闭时调用升阶子页Deactivate |
 
-Controller仅增加 `ServerRPC_EquipAdvanceSnapshot` 白名单与转发，Preview增加可选关联编号。UI不得提交下一阶ItemID或消耗，不得直接改背包。
+Controller 侧的 `ServerRPC_EquipAdvanceSnapshot` 仅保留给 GM/调试；升阶面板不再请求整包快照。UI不得提交下一阶ItemID或消耗，不得直接改背包。
 
 原生资产：
 
@@ -53,13 +55,27 @@ Controller仅增加 `ServerRPC_EquipAdvanceSnapshot` 白名单与转发，Previe
 
 ## 3. 数据、请求与生命周期
 
-### 只读快照
+### 背包读取（客户端本地，非 RPC）
 
-`Client.Snapshot(request)` → Controller → RPC.Snapshot → Runtime.UISnapshot → `Client_EquipAdvanceResult`。
+`Panel:RequestSnapshot()` → `EquipAdvanceLocalBag.Collect(PC)` → `EquipSlotSystem.CollectBagEquipItems(PC)`。取背包与装备预览页（`Game_Equip_Bag_UIBP`）、槽位强化页（`Game_Equip_Develop_Strengthen_UIBP:RefreshBagList`）完全同一个入口，全程在客户端 Lua 内完成，列表规模不产生任何 RPC 负载。
 
-快照包含 `OK/Code/Kind/ClientRequestID/Revision/Items/Levels/GoldHave/DiamondHave/Blocked`。Items中只返回显示和选择所需字段：Key、ItemID、EquippedSlot、SlotIdx、RankOrder、AllowedMaterial、SafeAuto、Locked、HasInvestment；不向UI发送整个CustomData背包副本。
+每件装备在本地补读 CustomData、数据大小、数量、穿戴槽与挂载状态，再用 `EquipAdvanceData.ProjectRow` 投影为行；该函数同时供服务端 `Runtime.UISnapshot` 使用，两端口径一致。六槽等级读 `EquipSlotSystem.GetSlotLevel`，金币/钻石读官方 VirtualItemManager，阻断状态读玩家档案里的恢复记录（读不到就按未阻断，服务端 Preview/Commit 仍会返回 RecoveryRequired）。
 
-Revision在服务端根据实例Key、数据、数量、穿戴、占用、数据大小、六槽等级、余额与阻断状态产生。**不能把每次重建的DefineID userdata对象地址放进指纹**，否则不变背包每秒也会失效。快照不会给GM权限，也不会标记装备已查看。
+快照包含 `OK/Code/Items/Levels/GoldHave/DiamondHave/Blocked/Revision/RowCount/LocalBag`。行字段为 Key、ItemID、EquippedSlot、SlotIdx、RankOrder、AllowedMaterial、SafeAuto、Locked、HasInvestment，外加仅本地可用的 DefineID（原生格子接口需要它）；CustomData 不进投影，因此这份数据将来也不可能被误当成 RPC 负载。SlotIdx/RankOrder 取自三张表而非内核槽位，手套/腰带这类没有内核槽的装备也能拿到正确逻辑槽。
+
+Revision 由行 Key/ItemID/槽位/阶位/穿戴/数量/数据大小/保护结果、六槽等级、两个余额与阻断状态拼成，**不含每次新建的 DefineID userdata 地址**，否则不变的背包每轮询一次就失效一次预览与二次确认。列表只在显示模式、目标、材料或 Revision 变化时 Reload。
+
+#### 为什么不再向服务端取整包快照
+
+2026-10-13 的 PIE 复现（大背包，约 200+ 件装备）留下明确证据：请求侧 `ServerRPC_EquipAdvanceSnapshot` 只有 `Size: 50`，而 DS 回传整份 `Client_EquipAdvanceResult` 时序列化直接失败：
+
+```
+SendLuaNetworkRemoteContent Failed: writer IsError() == TRUE after serializing, ... FunctionName: Client_EquipAdvanceResult
+```
+
+随后客户端 `ConnectionLongTimeNoReceived` / `OnUnrealNetworkLost`，表现为打开升阶页就掉线/报错。面板每 8 秒超时又重发一次请求，循环放大问题。装备预览页与强化页从来不做这种整包传输，所以同一背包下始终正常。
+
+GM/调试入口 `Client.Snapshot` 仍保留，但 `Runtime.UISnapshot` 回传行数受 `RPC_ROW_LIMIT=120` 限制，超出部分只报 `RowCount` 与 `Truncated`；`RPC.Preview` 的 `Candidates` 同样截断为 32 件并给出 `CandidateTotal`。玩家面板不依赖这两处。
 
 ### 预览、确认、提交
 
@@ -67,13 +83,15 @@ UI先用缓存表和快照显示需求/明显阻止原因，再调用 `PreviewFo
 
 客户端预览有效期110秒，服务端120秒；到期重新预览。选择变化或快照Revision变化会清除确认，并剔除不再合格的材料。提交时使用 `CommitForUI(token, request, true)`；提交期间冻结目标和材料选择。
 
-8秒未收到提交结果时，按钮允许“重试原请求”，沿用同一token/request；绝不能调用旧 `Confirm(true)` 创建另一个编号当作网络重试。成功/失败回复匹配后，清除提交状态、重新请求快照。跨断线/新进程恢复不由UI实现。
+8秒未收到提交结果时，按钮允许“重试原请求”，沿用同一token/request；绝不能调用旧 `Confirm(true)` 创建另一个编号当作网络重试。成功/失败回复匹配后，清除提交状态并立即本地重读背包（产物是新生成的实例，要等复制落到客户端才会出现在列表里，下一轮读取会自动补上）。跨断线/新进程恢复不由UI实现。
 
 ### 订阅与轮询
 
 Construct只设置轻量状态；InitData在控件可用后绑定委托、Subscribe并启动1秒轮询。**不要在Construct绑定NewButton委托**，本项目原生控件曾因此崩溃。每次InitData只保留一组绑定/一个timer；订阅以panel为key覆盖，不叠加。
 
-Deactivate停止timer、Unsubscribe、清除快照等待；非提交状态清除旧预览。Destruct还移除全部委托。主界面切页、点击关闭、管理器直接Close都走Deactivate。保留中的提交请求在重开后仍用相同编号查询/重试，不能重新合成。
+1秒timer仍用于事务超时与预览有效期；本地背包读取按 `BAG_INTERVAL=2` 秒节流，避免大背包下每帧重复读 CustomData。InitData、穿戴/挂载委托（`EquipSlotSystem.BindAttachChange`，与预览页同一委托且幂等）和提交结果都用 `RequestSnapshot(true)` 立即刷新，因此节流不会让界面显得迟钝。
+
+Deactivate停止timer、Unsubscribe、清除本地读取节流；非提交状态清除旧预览。Destruct还移除全部委托。主界面切页、点击关闭、管理器直接Close都走Deactivate。保留中的提交请求在重开后仍用相同编号查询/重试，不能重新合成。
 
 列表只有显示模式、目标、材料或Revision变化时Reload/Refresh。行点击闭包读取当前AdvanceData，而不是首次创建时的实例。异步图标加载使用弱引用及每个Image的请求序号，防止滚动复用时旧回调覆盖新图标。
 

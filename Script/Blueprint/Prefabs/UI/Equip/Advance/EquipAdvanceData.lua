@@ -25,6 +25,22 @@ function D.IsSafeAutoMaterial(record)
     return not D.IsProtected(record) and state.Viewed==true and not record.IsNew
         and (state.Gold or 0)==0 and (state.Diamond or 0)==0 and (state.MaterialParts or 0)==0
 end
+---升阶列表行的唯一投影口径：服务端 UISnapshot 与客户端本地背包快照共用。
+---只产出显示与选择所需字段，绝不放 CustomData / DefineID 进去（那是要过 RPC 的负载）。
+---@param record table A:Record 或本地等价记录（Key/ItemID/CustomData/Count/EquippedSlot/Attached/CustomDataSize）
+---@param cfg table|nil EquipAdvanceConfig.Items[ItemID]，未接入升阶的旧装备为 nil
+function D.ProjectRow(record,cfg)
+    local data=record.CustomData or {}
+    local state=data.EquipAdvance
+    if type(state)~='table' then state={} end
+    local valid=D.ValidState(data) and (record.Count or 0)==1 and (record.CustomDataSize or 0)<=512
+    return {Key=record.Key,ItemID=record.ItemID,EquippedSlot=record.EquippedSlot or '',
+        SlotIdx=cfg and cfg.SlotIdx or 0,RankOrder=cfg and cfg.RankOrder or 0,
+        AllowedMaterial=valid and not D.IsProtected(record) and true or false,
+        SafeAuto=valid and D.IsSafeAutoMaterial(record) and true or false,
+        Locked=state.Locked==true or data.Locked==true,
+        HasInvestment=valid and ((state.Gold or 0)>0 or (state.Diamond or 0)>0 or (state.MaterialParts or 0)>0) or false}
+end
 function D.ValidState(data)
     if type(data)~='table' then return false end
     local s=data.EquipAdvance
